@@ -9,20 +9,12 @@ spec:
   image: "sosedoff/pgweb"
   inactiveAfterSeconds: 0
   recycleAfterSeconds: 1800
-  readinessProbe:
-    httpGet:
-      path: "/"
-      port: 8080
-    initialDelaySeconds: 20
-    periodSeconds: 3
-    timeoutSeconds: 3
   command:
     - "/usr/bin/pgweb"
     - "--bind=0.0.0.0"
     - "--listen=8080"
   connectProbe: "/"
   privileged: false
-
   resources:
     requests:
       cpu: "1"
