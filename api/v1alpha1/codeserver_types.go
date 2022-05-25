@@ -36,6 +36,8 @@ const (
 	RuntimeVM RuntimeType = "vm"
 	// RuntimeCode stands for VS code.
 	RuntimeCode RuntimeType = "code"
+	// RuntimePGWeb stands for PGWeb instance.
+	RuntimePGWeb RuntimeType = "pgweb"
 )
 
 // CodeServerSpec defines the desired state of CodeServer
@@ -64,21 +66,23 @@ type CodeServerSpec struct {
 	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,11,opt,name=subdomain"`
 	// Specifies the envs
 	Envs []v1.EnvVar `json:"envs,omitempty" protobuf:"bytes,12,opt,name=envs"`
+	// Specifies the command
+	Command []string `json:"command,omitempty" protobuf:"bytes,13,rep,name=command"`
 	// Specifies the envs
-	Args []string `json:"args,omitempty" protobuf:"bytes,13,opt,name=args"`
+	Args []string `json:"args,omitempty" protobuf:"bytes,14,opt,name=args"`
 	// Specifies the image used to running code server
-	Image string `json:"image,omitempty" protobuf:"bytes,14,opt,name=image"`
+	Image string `json:"image,omitempty" protobuf:"bytes,15,opt,name=image"`
 	// Specifies the alive probe to detect whether pod is connected. Only http path are supported and time should be in
 	// the format of 2006-01-02T15:04:05.000Z.
-	ConnectProbe string `json:"connectProbe,omitempty" protobuf:"bytes,15,opt,name=connectProbe"`
+	ConnectProbe string `json:"connectProbe,omitempty" protobuf:"bytes,16,opt,name=connectProbe"`
 	// Whether to enable pod privileged
-	Privileged *bool `json:"privileged,omitempty" protobuf:"bytes,16,opt,name=privileged"`
+	Privileged *bool `json:"privileged,omitempty" protobuf:"bytes,17,opt,name=privileged"`
 	// Specifies the init plugins that will be running to finish before code server running.
-	InitPlugins map[string][]string `json:"initPlugins,omitempty" protobuf:"bytes,17,opt,name=initPlugins"`
+	InitPlugins map[string][]string `json:"initPlugins,omitempty" protobuf:"bytes,18,opt,name=initPlugins"`
 	// Specifies the node selector for scheduling.
-	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,18,opt,name=nodeSelector"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,19,opt,name=nodeSelector"`
 	// Specifies the liveness Probe.
-	LivenessProbe *v1.Probe `json:"livenessProbe,omitempty" protobuf:"bytes,19,opt,name=livenessProbe"`
+	LivenessProbe *v1.Probe `json:"livenessProbe,omitempty" protobuf:"bytes,20,opt,name=livenessProbe"`
 	// Specifies the readiness Probe.
 	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty" protobuf:"bytes,19,opt,name=readinessProbe"`
 }

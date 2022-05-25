@@ -1,0 +1,29 @@
+apiVersion: cs.opensourceways.com/v1alpha1
+kind: CodeServer
+metadata:
+  name: pgweb-server
+  namespace: default
+spec:
+  runtime: pgweb
+  subdomain: pgweb-server-sample
+  image: "sosedoff/pgweb"
+  inactiveAfterSeconds: 0
+  recycleAfterSeconds: 1800
+  readinessProbe:
+    httpGet:
+      path: "/"
+      port: 8080
+    initialDelaySeconds: 20
+    periodSeconds: 3
+    timeoutSeconds: 3
+  command:
+    - "/usr/bin/pgweb"
+    - "--bind=0.0.0.0"
+    - "--listen=8080"
+  connectProbe: "/"
+  privileged: false
+
+  resources:
+    requests:
+      cpu: "1"
+      memory: "1000Mi"
