@@ -814,7 +814,7 @@ func (r *CodeServerReconciler) deploymentForPGWeb(m *csv1alpha1.CodeServer, secr
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector:   m.Spec.NodeSelector,
+					NodeSelector: m.Spec.NodeSelector,
 					Containers: []corev1.Container{
 						{
 							Image:           m.Spec.Image,
@@ -823,9 +823,9 @@ func (r *CodeServerReconciler) deploymentForPGWeb(m *csv1alpha1.CodeServer, secr
 							Args:            m.Spec.Args,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &priviledged,
-							Resources:      m.Spec.Resources,
-							LivenessProbe:  m.Spec.LivenessProbe,
-							ReadinessProbe: m.Spec.ReadinessProbe,
+							Resources:       m.Spec.Resources,
+							LivenessProbe:   m.Spec.LivenessProbe,
+							ReadinessProbe:  m.Spec.ReadinessProbe,
 						},
 					},
 				},

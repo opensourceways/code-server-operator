@@ -122,6 +122,36 @@ spec:
       - https://github.com/TommyLike/tommylike.me.git
 ```
 
+# PGWeb Instance
+```shell
+apiVersion: cs.opensourceways.com/v1alpha1
+kind: CodeServer
+metadata:
+  name: pgweb-server
+  namespace: default
+spec:
+  runtime: pgweb
+  subdomain: pgweb-server-sample
+  image: "opensourceway/opengauss-pgweb:0.0.5"
+  inactiveAfterSeconds: 0
+  recycleAfterSeconds: 1800
+  command:
+    - /bin/bash
+    - -c
+    - |
+      whoami
+      source ~/.bashrc
+      /home/gauss/openGauss/install/bin/gs_ctl start -D /home/gauss/openGauss/data
+      gsql -d postgres  -p 5432  -h 127.0.0.1  -U gauss -W openGauss2022 -c "CREATE USER opengauss with createdb IDENTIFIED BY 'openGauss2022'"
+      /usr/bin/pgweb --bind=0.0.0.0 --listen=8080 --url "postgres://opengauss:openGauss2022@0.0.0.0:5432/postgres?sslmode=disable"
+  connectProbe: "/"
+  privileged: false
+  resources:
+    requests:
+      cpu: "1"
+      memory: "1000Mi"
+```
+
 # Features
 1. Release compute resource if the code server keeps inactive for some time.
 2. Release volume resource if the code server has not been used for a period of long time.
