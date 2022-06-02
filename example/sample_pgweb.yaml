@@ -1,12 +1,12 @@
 apiVersion: cs.opensourceways.com/v1alpha1
 kind: CodeServer
 metadata:
-  name: pgweb-server
+  name: opengaussweb-server-sample
   namespace: default
 spec:
   runtime: pgweb
-  subdomain: pgweb-server-sample
-  image: "opensourceway/opengauss-pgweb:0.0.5"
+  subdomain: opengaussweb-server-sample
+  image: "opensourceway/opengauss-pgweb:0.0.9"
   inactiveAfterSeconds: 0
   recycleAfterSeconds: 1800
   command:
@@ -22,5 +22,5 @@ spec:
   privileged: false
   resources:
     requests:
-      cpu: "1"
-      memory: "1000Mi"
+      cpu: "500m"
+      memory: "500Mi"
