@@ -52,6 +52,7 @@ const (
 	MaxActiveSeconds = 60 * 60 * 24
 	MaxKeepSeconds   = 60 * 60 * 24 * 30
 	HttpPort         = 8080
+	DefaultWorkspace = "/workspace"
 	UserPort         = 80
 	IngressLimitKey  = "kubernetes.io/ingress-bandwidth"
 	EgressLimitKey   = "kubernetes.io/egress-bandwidth"
@@ -622,8 +623,11 @@ func (r *CodeServerReconciler) newDeployment(m *csv1alpha1.CodeServer, secret *c
 		//Create code server environment with gotty based terminal which runs on lxd
 		return r.deploymentForLxd(m, secret), nil
 	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimePGWeb)) {
-		//Create pgweb environment
-		return r.deploymentForPGWeb(m, secret), nil
+		//Create generic environment
+		return r.deploymentForGeneric(m, secret), nil
+	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGeneric)) {
+		//Create generic environment
+		return r.deploymentForGeneric(m, secret), nil
 	} else {
 		return nil, errrorlib.New(fmt.Sprintf("unsupported runtime %s", m.Spec.Runtime))
 	}
@@ -781,22 +785,28 @@ func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServe
 	return dep
 }
 
-func (r *CodeServerReconciler) deploymentForPGWeb(m *csv1alpha1.CodeServer, secret *corev1.Secret) *appsv1.Deployment {
+// deploymentForGeneric returns a code server with generic temporary environments
+func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer, secret *corev1.Secret) *appsv1.Deployment {
+	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	ls := appLabel(m.Name)
+	baseCodeDir := r.getDefaultWorkSpace(m)
+	baseCodeVolume := "code-server-workspace"
 	replicas := int32(1)
 	enablePriviledge := m.Spec.Privileged
 	priviledged := corev1.SecurityContext{
 		Privileged: enablePriviledge,
 	}
+	initContainer := r.addInitContainersForDeployment(m, baseCodeDir, baseCodeVolume)
+	reqLogger.Info(fmt.Sprintf("init containers has been injected into deployment %v", initContainer))
 	//convert liveness or readiness probe
 	if m.Spec.LivenessProbe != nil {
 		if m.Spec.LivenessProbe.HTTPGet != nil {
-			m.Spec.LivenessProbe.HTTPGet.Port = intstr.FromInt(HttpPort)
+			m.Spec.LivenessProbe.HTTPGet.Port = r.getContainerPort(m)
 		}
 	}
 	if m.Spec.ReadinessProbe != nil {
 		if m.Spec.ReadinessProbe.HTTPGet != nil {
-			m.Spec.ReadinessProbe.HTTPGet.Port = intstr.FromInt(HttpPort)
+			m.Spec.ReadinessProbe.HTTPGet.Port = r.getContainerPort(m)
 		}
 	}
 	dep := &appsv1.Deployment{
@@ -814,34 +824,76 @@ func (r *CodeServerReconciler) deploymentForPGWeb(m *csv1alpha1.CodeServer, secr
 					Labels: ls,
 				},
 				Spec: corev1.PodSpec{
-					NodeSelector: m.Spec.NodeSelector,
+					InitContainers: initContainer,
+					NodeSelector:   m.Spec.NodeSelector,
 					Containers: []corev1.Container{
 						{
 							Image:           m.Spec.Image,
 							Name:            CSNAME,
 							Env:             m.Spec.Envs,
 							Args:            m.Spec.Args,
+							Command:         m.Spec.Command,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &priviledged,
-							Resources:       m.Spec.Resources,
-							LivenessProbe:   m.Spec.LivenessProbe,
-							ReadinessProbe:  m.Spec.ReadinessProbe,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: baseCodeDir,
+									Name:      baseCodeVolume,
+								},
+							},
+							Resources:      m.Spec.Resources,
+							LivenessProbe:  m.Spec.LivenessProbe,
+							ReadinessProbe: m.Spec.ReadinessProbe,
 						},
 					},
 				},
 			},
 		},
 	}
+	// add volume pvc pr emptyDir
+	if r.needDeployPVC(m.Spec.StorageName) {
+		dataVolume := corev1.PersistentVolumeClaimVolumeSource{
+			ClaimName: m.Name,
+		}
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: baseCodeVolume,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &dataVolume,
+			},
+		})
+	} else {
+		volumeQuantity, _ := resourcev1.ParseQuantity(m.Spec.StorageSize)
+		dataVolume := corev1.EmptyDirVolumeSource{
+			SizeLimit: &volumeQuantity,
+		}
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: baseCodeVolume,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &dataVolume,
+			},
+		})
+	}
 	//https will be disabled no matter secret is provided or not. we also export same port here.
 	for index, con := range dep.Spec.Template.Spec.Containers {
 		if con.Name == CSNAME {
-			if len(m.Spec.Command) != 0 {
-				dep.Spec.Template.Spec.Containers[index].Command = m.Spec.Command
+			specifiedPort, err := strconv.Atoi(m.Spec.ContainerPort)
+			if len(m.Spec.ContainerPort) == 0 || err != nil {
+				dep.Spec.Template.Spec.Containers[index].Ports = append(
+					dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
+						ContainerPort: HttpPort,
+						Name:          "http",
+					})
+			} else {
+				dep.Spec.Template.Spec.Containers[index].Ports = append(
+					dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
+						ContainerPort: int32(specifiedPort),
+						Name:          "http",
+					})
 			}
 			dep.Spec.Template.Spec.Containers[index].Ports = append(
 				dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
-					ContainerPort: HttpPort,
-					Name:          "http",
+					ContainerPort: UserPort,
+					Name:          "user",
 				})
 		}
 	}
@@ -862,7 +914,7 @@ func (r *CodeServerReconciler) deploymentForPGWeb(m *csv1alpha1.CodeServer, secr
 func (r *CodeServerReconciler) deploymentForGotty(m *csv1alpha1.CodeServer, secret *corev1.Secret) *appsv1.Deployment {
 	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	ls := appLabel(m.Name)
-	baseCodeDir := m.Spec.WorkspaceLocation
+	baseCodeDir := r.getDefaultWorkSpace(m)
 	baseCodeVolume := "code-server-workspace"
 	replicas := int32(1)
 	enablePriviledge := m.Spec.Privileged
@@ -1072,7 +1124,7 @@ func (r *CodeServerReconciler) assembleBaseLxdEnvs(
 func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer, secret *corev1.Secret) *appsv1.Deployment {
 	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	ls := appLabel(m.Name)
-	baseProxyDir := m.Spec.WorkspaceLocation
+	baseProxyDir := r.getDefaultWorkSpace(m)
 	baseProxyVolume := "code-server-workspace"
 	replicas := int32(1)
 	enablePriviledge := m.Spec.Privileged
@@ -1179,6 +1231,21 @@ func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer, secret
 	return dep
 }
 
+func (r *CodeServerReconciler) getContainerPort(m *csv1alpha1.CodeServer) intstr.IntOrString {
+	if len(m.Spec.ContainerPort) == 0 {
+		return intstr.FromInt(HttpPort)
+	}
+	return intstr.Parse(m.Spec.ContainerPort)
+}
+
+func (r *CodeServerReconciler) getDefaultWorkSpace(m *csv1alpha1.CodeServer) string {
+	if len(m.Spec.WorkspaceLocation) == 0 {
+		return DefaultWorkspace
+	} else {
+		return m.Spec.WorkspaceLocation
+	}
+}
+
 // newService function takes in a CodeServer object and returns a Service for that object.
 func (r *CodeServerReconciler) newService(m *csv1alpha1.CodeServer, secret *corev1.Secret) *corev1.Service {
 	ls := appLabel(m.Name)
@@ -1195,7 +1262,7 @@ func (r *CodeServerReconciler) newService(m *csv1alpha1.CodeServer, secret *core
 		Port:       HttpPort,
 		Name:       "http",
 		Protocol:   corev1.ProtocolTCP,
-		TargetPort: intstr.FromInt(HttpPort),
+		TargetPort: r.getContainerPort(m),
 	})
 	ser.Spec.Ports = append(ser.Spec.Ports, corev1.ServicePort{
 		Port:       UserPort,

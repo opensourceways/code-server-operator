@@ -36,8 +36,10 @@ const (
 	RuntimeVM RuntimeType = "vm"
 	// RuntimeCode stands for VS code.
 	RuntimeCode RuntimeType = "code"
-	// RuntimePGWeb stands for PGWeb instance.
+	// RuntimePGWeb stands for PGWeb instance. NOTE: use generic instead
 	RuntimePGWeb RuntimeType = "pgweb"
+	// RuntimeGeneric stands for generic instance.
+	RuntimeGeneric RuntimeType = "generic"
 )
 
 // CodeServerSpec defines the desired state of CodeServer
@@ -85,6 +87,8 @@ type CodeServerSpec struct {
 	LivenessProbe *v1.Probe `json:"livenessProbe,omitempty" protobuf:"bytes,20,opt,name=livenessProbe"`
 	// Specifies the readiness Probe.
 	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty" protobuf:"bytes,19,opt,name=readinessProbe"`
+	// Specifies the terminal container port for connection, defaults in 8080.
+	ContainerPort string `json:"containerPort,omitempty" protobuf:"bytes,20,opt,name=containerPort"`
 }
 
 // ServerConditionType describes the type of state of code server condition

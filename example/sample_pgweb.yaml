@@ -2,9 +2,9 @@ apiVersion: cs.opensourceways.com/v1alpha1
 kind: CodeServer
 metadata:
   name: opengaussweb-server-sample
-  namespace: default
+  namespace: opengauss-tryme
 spec:
-  runtime: pgweb
+  runtime: generic
   subdomain: opengaussweb-server-sample
   image: "opensourceway/opengauss-pgweb:0.0.9"
   inactiveAfterSeconds: 0

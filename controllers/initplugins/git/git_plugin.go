@@ -6,7 +6,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/opensourceways/code-server-operator/controllers/initplugins/interface"
 	corev1 "k8s.io/api/core/v1"
-	"strings"
 )
 
 const (
@@ -18,16 +17,21 @@ type GitPlugin struct {
 	Parameters    []string
 	ImageUrl      string
 	RepoUrl       string
+	RepoFolder    string
 	BaseDirectory string
 }
 
 func (p *GitPlugin) parseFlags(arguments []string) {
 	flagSet := flag.NewFlagSet(GetName(), flag.ContinueOnError)
 	flagSet.StringVar(&p.RepoUrl, "repourl", "", "The git repo for git plugin to clone, username and password should be provided if it's private repo, for instance: https://username:password@github.com/username/repository.git")
+	flagSet.StringVar(&p.RepoFolder, "repofolder", "", "The repo folder will be cloned into, if not specified, 'data' will be used.")
 	if err := flagSet.Parse(arguments); err != nil {
 		glog.Errorf("plugin %s flagset parse failed, err: %v", GetName(), err)
 	}
 	p.ImageUrl = DefaultImageUrl
+	if len(p.RepoFolder) == 0 {
+		p.RepoFolder = "data"
+	}
 	return
 }
 
@@ -39,8 +43,7 @@ func Create(c _interface.PluginClients, parameters []string, baseDir string) _in
 
 func (p *GitPlugin) GenerateInitContainerSpec() *corev1.Container {
 
-	paths := strings.Split(p.RepoUrl, "/")
-	command := []string{"sh", "-c", fmt.Sprintf("cd %s && [ ! -d ./%s ] && git clone %s", p.BaseDirectory, paths[len(paths)-1], p.RepoUrl)}
+	command := []string{"sh", "-c", fmt.Sprintf("cd %s && [ ! -d ./%s ] && git clone %s %s", p.BaseDirectory, p.RepoFolder, p.RepoUrl, p.RepoFolder)}
 	container := corev1.Container{
 		Image:           p.ImageUrl,
 		Name:            "init-git-clone",
