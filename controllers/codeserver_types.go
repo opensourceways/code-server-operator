@@ -29,7 +29,6 @@ type CodeServerOption struct {
 	MaxProbeRetry       int
 	HttpsSecretName     string
 	LxdClientSecretName string
-	UrlPrefix           string
 	EnableUserIngress   bool
 	MaxConcurrency      int
 }

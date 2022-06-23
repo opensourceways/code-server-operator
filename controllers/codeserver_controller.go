@@ -57,10 +57,8 @@ const (
 	IngressLimitKey  = "kubernetes.io/ingress-bandwidth"
 	EgressLimitKey   = "kubernetes.io/egress-bandwidth"
 	StorageEmptyDir  = "emptyDir"
-	DefaultPrefix    = "terminal"
 	InstanceEndpoint = "instanceEndpoint"
 	TerminalIngress  = "%s-terminal"
-	UserPortIngress  = "%s-user-port"
 )
 
 // CodeServerReconciler reconciles a CodeServer object
@@ -182,11 +180,7 @@ func (r *CodeServerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		}
 		// 3/5:reconcile ingress
 		if failed == nil {
-			_, failed = r.reconcileForTerminalIngress(codeServer, tlsSecret)
-		}
-
-		if r.Options.EnableUserIngress && failed == nil {
-			_, failed = r.reconcileForUserPortIngress(codeServer, tlsSecret)
+			_, failed = r.reconcileForIngress(codeServer, tlsSecret)
 		}
 		// 4/5: reconcile deployment
 		if failed == nil {
@@ -428,11 +422,11 @@ func (r *CodeServerReconciler) serverReady(codeServer *csv1alpha1.CodeServer, se
 	reqLogger.Info("Waiting Service Ready.")
 	instEndpoint := ""
 	if secret == nil {
-		instEndpoint = fmt.Sprintf("http://%s.%s/%s/%s", codeServer.Spec.Subdomain, r.Options.DomainName,
-			DefaultPrefix, strings.TrimLeft(codeServer.Spec.ConnectProbe, "/"))
+		instEndpoint = fmt.Sprintf("http://%s.%s/%s", codeServer.Spec.Subdomain, r.Options.DomainName,
+			strings.TrimLeft(codeServer.Spec.ConnectProbe, "/"))
 	} else {
-		instEndpoint = fmt.Sprintf("https://%s.%s/%s/%s", codeServer.Spec.Subdomain, r.Options.DomainName,
-			DefaultPrefix, strings.TrimLeft(codeServer.Spec.ConnectProbe, "/"))
+		instEndpoint = fmt.Sprintf("https://%s.%s/%s", codeServer.Spec.Subdomain, r.Options.DomainName,
+			strings.TrimLeft(codeServer.Spec.ConnectProbe, "/"))
 	}
 	resp, err := http.Get(instEndpoint)
 	if err != nil {
@@ -484,18 +478,18 @@ func (r *CodeServerReconciler) reconcileForDeployment(codeServer *csv1alpha1.Cod
 	return oldDev, nil
 }
 
-func (r *CodeServerReconciler) reconcileForTerminalIngress(codeServer *csv1alpha1.CodeServer, secret *corev1.Secret) (*extv1.Ingress, error) {
+func (r *CodeServerReconciler) reconcileForIngress(codeServer *csv1alpha1.CodeServer, secret *corev1.Secret) (*extv1.Ingress, error) {
 	reqLogger := r.Log.WithValues("namespace", codeServer.Namespace, "name", codeServer.Name)
-	reqLogger.Info("Reconciling terminal ingress.")
+	reqLogger.Info("Reconciling ingress.")
 	//reconcile ingress for code server
-	newIngress := r.NewTerminalIngress(codeServer, secret)
+	newIngress := r.NewIngress(codeServer, secret)
 	oldIngress := &extv1.Ingress{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf(TerminalIngress, codeServer.Name), Namespace: codeServer.Namespace}, oldIngress)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a terminal ingress.")
+		reqLogger.Info("Creating an ingress.")
 		err = r.Client.Create(context.TODO(), newIngress)
 		if err != nil {
-			reqLogger.Error(err, "Failed to create terminal ingress.")
+			reqLogger.Error(err, "Failed to create ingress.")
 			return nil, err
 		}
 		// if update is required
@@ -507,45 +501,10 @@ func (r *CodeServerReconciler) reconcileForTerminalIngress(codeServer *csv1alpha
 		}
 		if !equality.Semantic.DeepEqual(oldIngress.Spec, newIngress.Spec) {
 			oldIngress.Spec = newIngress.Spec
-			reqLogger.Info("Updating a terminal ingress.")
+			reqLogger.Info("Updating an ingress.")
 			err = r.Client.Update(context.TODO(), oldIngress)
 			if err != nil {
-				reqLogger.Error(err, "Failed to update terminal ingress.")
-				return nil, err
-			}
-		}
-	}
-	return oldIngress, nil
-}
-
-func (r *CodeServerReconciler) reconcileForUserPortIngress(codeServer *csv1alpha1.CodeServer, secret *corev1.Secret) (*extv1.Ingress, error) {
-	reqLogger := r.Log.WithValues("namespace", codeServer.Namespace, "name", codeServer.Name)
-	reqLogger.Info("Reconciling user port ingress.")
-	//reconcile ingress for code server
-	newIngress := r.newUserPortIngress(codeServer, secret)
-	oldIngress := &extv1.Ingress{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf(UserPortIngress, codeServer.Name),
-		Namespace: codeServer.Namespace}, oldIngress)
-	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a user port ingress.")
-		err = r.Client.Create(context.TODO(), newIngress)
-		if err != nil {
-			reqLogger.Error(err, "Failed to create user port ingress.")
-			return nil, err
-		}
-		// if update is required
-	} else {
-		if err != nil {
-			//Reschedule the event
-			reqLogger.Error(err, fmt.Sprintf("Failed to get Ingress for %s.", codeServer.Name))
-			return nil, err
-		}
-		if !equality.Semantic.DeepEqual(oldIngress.Spec, newIngress.Spec) {
-			oldIngress.Spec = newIngress.Spec
-			reqLogger.Info("Updating a Ingress for user port.")
-			err = r.Client.Update(context.TODO(), oldIngress)
-			if err != nil {
-				reqLogger.Error(err, "Failed to update user port ingress.")
+				reqLogger.Error(err, "Failed to update ingress.")
 				return nil, err
 			}
 		}
@@ -639,15 +598,15 @@ func (r *CodeServerReconciler) getInstanceEndpoint(m *csv1alpha1.CodeServer, tls
 	if tlsSecret == nil {
 		//websocket
 		if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGotty)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeLxd)) {
-			return fmt.Sprintf("ws://%s.%s/%s/ws", m.Spec.Subdomain, r.Options.DomainName, DefaultPrefix)
+			return fmt.Sprintf("ws://%s.%s/ws", m.Spec.Subdomain, r.Options.DomainName)
 		} else {
-			return fmt.Sprintf("http://%s.%s/%s", m.Spec.Subdomain, r.Options.DomainName, DefaultPrefix)
+			return fmt.Sprintf("http://%s.%s/", m.Spec.Subdomain, r.Options.DomainName)
 		}
 	} else {
 		if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGotty)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeLxd)) {
-			return fmt.Sprintf("wss://%s.%s/%s/ws", m.Spec.Subdomain, r.Options.DomainName, DefaultPrefix)
+			return fmt.Sprintf("wss://%s.%s/ws", m.Spec.Subdomain, r.Options.DomainName)
 		} else {
-			return fmt.Sprintf("https://%s.%s/%s", m.Spec.Subdomain, r.Options.DomainName, DefaultPrefix)
+			return fmt.Sprintf("https://%s.%s/", m.Spec.Subdomain, r.Options.DomainName)
 		}
 	}
 }
@@ -1309,68 +1268,13 @@ func (r *CodeServerReconciler) newPVC(m *csv1alpha1.CodeServer) (*corev1.Persist
 	return pvc, nil
 }
 
-func (r *CodeServerReconciler) getInstanceUrl(m *csv1alpha1.CodeServer) string {
-	if len(r.Options.UrlPrefix) == 0 {
-		//use the default prefix here. we need url prefix no matter it's configured or not
-		return fmt.Sprintf("/%s", DefaultPrefix)
-	} else {
-		return fmt.Sprintf("/%s", strings.Trim(r.Options.UrlPrefix, "/"))
-	}
-}
-
-// newUserPortIngress function takes in a CodeServer object and returns an ingress for that object.
-func (r *CodeServerReconciler) newUserPortIngress(
-	m *csv1alpha1.CodeServer, secret *corev1.Secret) *extv1.Ingress {
-	httpValue := extv1.HTTPIngressRuleValue{
-		Paths: []extv1.HTTPIngressPath{
-			{
-				Path: "/",
-				Backend: extv1.IngressBackend{
-					ServiceName: m.Name,
-					ServicePort: intstr.FromInt(UserPort),
-				},
-			},
-		},
-	}
-	ingress := &extv1.Ingress{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(UserPortIngress, m.Name),
-			Namespace: m.Namespace,
-			Annotations: map[string]string{
-				"kubernetes.io/ingress.class": "nginx",
-			},
-		},
-		Spec: extv1.IngressSpec{
-			Rules: []extv1.IngressRule{
-				{
-					Host: fmt.Sprintf("%s.%s", m.Spec.Subdomain, r.Options.DomainName),
-					IngressRuleValue: extv1.IngressRuleValue{
-						HTTP: &httpValue,
-					},
-				},
-			},
-		},
-	}
-	if secret != nil {
-		ingress.Spec.TLS = []extv1.IngressTLS{
-			{
-				Hosts:      []string{fmt.Sprintf("%s.%s", m.Spec.Subdomain, r.Options.DomainName)},
-				SecretName: r.Options.HttpsSecretName,
-			},
-		}
-	}
-	// Set CodeServer instance as the owner of the ingress.
-	controllerutil.SetControllerReference(m, ingress, r.Scheme)
-	return ingress
-}
-
-// NewTerminalIngress function takes in a CodeServer object and returns an ingress for that object.
-func (r *CodeServerReconciler) NewTerminalIngress(m *csv1alpha1.CodeServer, secret *corev1.Secret) *extv1.Ingress {
+// NewIngress function takes in a CodeServer object and returns an ingress for that object.
+func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer, secret *corev1.Secret) *extv1.Ingress {
 	servicePort := intstr.FromInt(HttpPort)
 	httpValue := extv1.HTTPIngressRuleValue{
 		Paths: []extv1.HTTPIngressPath{
 			{
-				Path: fmt.Sprintf("%s(/|$)(.*)", r.getInstanceUrl(m)),
+				Path: "/",
 				Backend: extv1.IngressBackend{
 					ServiceName: m.Name,
 					ServicePort: servicePort,
@@ -1409,15 +1313,7 @@ func (r *CodeServerReconciler) NewTerminalIngress(m *csv1alpha1.CodeServer, secr
 }
 
 func (r *CodeServerReconciler) annotationsForIngress(m *csv1alpha1.CodeServer, secret *corev1.Secret) map[string]string {
-	snippet := fmt.Sprintf(`proxy_set_header Accept-Encoding '';
-sub_filter '<head>' '<head> <base href="%s/">';`, r.getInstanceUrl(m))
-	annotation := map[string]string{
-		"kubernetes.io/ingress.class":                       "nginx",
-		"nginx.ingress.kubernetes.io/use-regex":             "true",
-		"nginx.ingress.kubernetes.io/rewrite-target":        "/$2",
-		"nginx.ingress.kubernetes.io/configuration-snippet": snippet,
-	}
-
+	annotation := map[string]string{}
 	// currently, we don't enable https
 	//annotation["nginx.ingress.kubernetes.io/secure-backends"] = "true"
 	//annotation["nginx.ingress.kubernetes.io/backend-protocol"] = "HTTPS"
