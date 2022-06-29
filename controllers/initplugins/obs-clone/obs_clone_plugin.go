@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	OBSCloneImageUrl = "opensourceway/xihe-plugin:0.1.1"
+	OBSCloneImageUrl = "opensourceway/xihe-plugin:0.1.2"
 )
 
 type OBSClonePlugin struct {
