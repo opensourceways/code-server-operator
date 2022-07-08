@@ -33,7 +33,7 @@ func Create(c _interface.PluginClients, parameters []string, baseDir string) _in
 
 func (p *OBSClonePlugin) GenerateInitContainerSpec() *corev1.Container {
 	//TODO update this logic
-	args := append(p.Parameters, fmt.Sprintf("--dest=%s", filepath.Join(p.BaseDirectory, "content")))
+	args := append(p.Parameters, fmt.Sprintf("--dest=%s/", filepath.Join(p.BaseDirectory, "content")))
 	container := corev1.Container{
 		Image:           p.ImageUrl,
 		Name:            "init-obs-clone",

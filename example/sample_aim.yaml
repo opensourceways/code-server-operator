@@ -1,0 +1,38 @@
+apiVersion: cs.opensourceways.com/v1alpha1
+kind: CodeServer
+metadata:
+  name: codeserver-gradio-sample
+  namespace: default
+spec:
+  runtime: generic
+  subdomain: codeservergradio
+  image: "tommylike/gradio-container:0.0.1"
+  storageSize: "1Gi"
+  storageName: "emptyDir"
+  inactiveAfterSeconds: 600
+  recycleAfterSeconds: 1200
+  resources:
+    requests:
+      cpu: "0.5"
+      memory: "512Mi"
+  connectProbe: "/"
+  workspaceLocation: "/workspace"
+  envs:
+    - name: GRADIO_SERVER_PORT
+      value: "8080"
+    - name: GRADIO_SERVER_NAME
+      value: "0.0.0.0"
+  command:
+    - /bin/bash
+    - -c
+    - |
+      cd /workspace/content
+      pip install -r requirements.txt
+      exec python3 launch.py
+  initPlugins:
+    obs-clone:
+      - --source=xihe-obj/models/wesley/lenet_mnist/
+      - --obs-ak=<ak>
+      - --obs-sk=<sk>
+      - --obs-bucketname=obs-xihe-beijing4-test
+      - --obs-endpoint=obs.cn-north-4.myhuaweicloud.com
