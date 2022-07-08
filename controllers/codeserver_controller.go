@@ -1430,6 +1430,14 @@ func filterOutCondition(states *csv1alpha1.CodeServerStatus, currentCondition cs
 				condition.LastUpdateTime = metav1.Now()
 				condition.LastTransitionTime = metav1.Now()
 			}
+			if condition.Type == csv1alpha1.ServerErrored || condition.Status == corev1.ConditionTrue {
+				//update error condition if ready is true
+				condition.Status = corev1.ConditionFalse
+				condition.LastUpdateTime = metav1.Now()
+				condition.LastTransitionTime = metav1.Now()
+				condition.Message = map[string]string{}
+				condition.Reason = "code server becomes ready"
+			}
 		}
 		newConditions = append(newConditions, condition)
 	}
