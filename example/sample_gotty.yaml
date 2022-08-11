@@ -20,14 +20,15 @@ spec:
     initialDelaySeconds: 3
     periodSeconds: 3
     timeoutSeconds: 3
+  containerPort: "8080"
   workspaceLocation: "/workspace"
   envs:
     - name: GOTTY_ONLY_ENABLE_BACKEND_WS_SERVER
-      value: "true"
+      value: "false"
     - name: DISABLE_AUTO_UPDATE
       value: "true"
     - name: GOTTY_CREDENTIAL
-      value: "12345678"
+      value: "1234:5678"
     - name: GOTTY_MAX_CONNECTION
       value: "10"
     - name: COMMUNITY_EMAIL
@@ -36,6 +37,8 @@ spec:
       value: ".*"
     - name: GOTTY_PERMIT_WRITE
       value: "true"
+    - name: GOTTY_PORT
+      value: "8080"
   args:
     - zsh
   connectProbe: "/active-time"

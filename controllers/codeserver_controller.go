@@ -53,7 +53,6 @@ const (
 	MaxKeepSeconds   = 60 * 60 * 24 * 30
 	HttpPort         = 8080
 	DefaultWorkspace = "/workspace"
-	UserPort         = 80
 	IngressLimitKey  = "kubernetes.io/ingress-bandwidth"
 	EgressLimitKey   = "kubernetes.io/egress-bandwidth"
 	StorageEmptyDir  = "emptyDir"
@@ -578,18 +577,12 @@ func (r *CodeServerReconciler) newDeployment(m *csv1alpha1.CodeServer, secret *c
 	if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeCode)) {
 		//Create code server environment with vs code
 		return r.deploymentForVSCodeServer(m, secret), nil
-	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGotty)) {
+	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGotty)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimePGWeb)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGeneric)) {
 		//Create code server environment with gotty based terminal
-		return r.deploymentForGotty(m, secret), nil
+		return r.deploymentForGeneric(m, secret), nil
 	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeLxd)) {
 		//Create code server environment with gotty based terminal which runs on lxd
 		return r.deploymentForLxd(m, secret), nil
-	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimePGWeb)) {
-		//Create generic environment
-		return r.deploymentForGeneric(m, secret), nil
-	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGeneric)) {
-		//Create generic environment
-		return r.deploymentForGeneric(m, secret), nil
 	} else {
 		return nil, errrorlib.New(fmt.Sprintf("unsupported runtime %s", m.Spec.Runtime))
 	}
@@ -838,144 +831,11 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer, se
 	//https will be disabled no matter secret is provided or not. we also export same port here.
 	for index, con := range dep.Spec.Template.Spec.Containers {
 		if con.Name == CSNAME {
-			specifiedPort, err := strconv.Atoi(m.Spec.ContainerPort)
-			if len(m.Spec.ContainerPort) == 0 || err != nil {
-				dep.Spec.Template.Spec.Containers[index].Ports = append(
-					dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
-						ContainerPort: HttpPort,
-						Name:          "http",
-					})
-			} else {
-				dep.Spec.Template.Spec.Containers[index].Ports = append(
-					dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
-						ContainerPort: int32(specifiedPort),
-						Name:          "http",
-					})
-			}
+			containerPort := r.getContainerPort(m)
 			dep.Spec.Template.Spec.Containers[index].Ports = append(
 				dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
-					ContainerPort: UserPort,
-					Name:          "user",
-				})
-		}
-	}
-	// Append ingress and egress limit
-	dep.Spec.Template.Annotations = map[string]string{}
-	if len(m.Spec.IngressBandwidth) != 0 {
-		dep.Spec.Template.Annotations[IngressLimitKey] = m.Spec.IngressBandwidth
-	}
-	if len(m.Spec.EgressBandwidth) != 0 {
-		dep.Spec.Template.Annotations[EgressLimitKey] = m.Spec.EgressBandwidth
-	}
-	// Set CodeServer instance as the owner of the Deployment.
-	controllerutil.SetControllerReference(m, dep, r.Scheme)
-	return dep
-}
-
-// deploymentForGotty returns an instance with gotty based terminal Deployment object for gotty
-func (r *CodeServerReconciler) deploymentForGotty(m *csv1alpha1.CodeServer, secret *corev1.Secret) *appsv1.Deployment {
-	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
-	ls := appLabel(m.Name)
-	baseCodeDir := r.getDefaultWorkSpace(m)
-	baseCodeVolume := "code-server-workspace"
-	replicas := int32(1)
-	enablePriviledge := m.Spec.Privileged
-	priviledged := corev1.SecurityContext{
-		Privileged: enablePriviledge,
-	}
-	initContainer := r.addInitContainersForDeployment(m, baseCodeDir, baseCodeVolume)
-	reqLogger.Info(fmt.Sprintf("init containers has been injected into deployment %v", initContainer))
-	//convert liveness or readiness probe
-	if m.Spec.LivenessProbe != nil {
-		if m.Spec.LivenessProbe.HTTPGet != nil {
-			m.Spec.LivenessProbe.HTTPGet.Port = intstr.FromInt(HttpPort)
-		}
-	}
-	if m.Spec.ReadinessProbe != nil {
-		if m.Spec.ReadinessProbe.HTTPGet != nil {
-			m.Spec.ReadinessProbe.HTTPGet.Port = intstr.FromInt(HttpPort)
-		}
-	}
-	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      m.Name,
-			Namespace: m.Namespace,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: ls,
-			},
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: ls,
-				},
-				Spec: corev1.PodSpec{
-					InitContainers: initContainer,
-					NodeSelector:   m.Spec.NodeSelector,
-					Containers: []corev1.Container{
-						{
-							Image:           m.Spec.Image,
-							Name:            CSNAME,
-							Env:             m.Spec.Envs,
-							Args:            m.Spec.Args,
-							ImagePullPolicy: corev1.PullIfNotPresent,
-							SecurityContext: &priviledged,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									MountPath: baseCodeDir,
-									Name:      baseCodeVolume,
-								},
-							},
-							Resources:      m.Spec.Resources,
-							LivenessProbe:  m.Spec.LivenessProbe,
-							ReadinessProbe: m.Spec.ReadinessProbe,
-						},
-					},
-				},
-			},
-		},
-	}
-	// add volume pvc pr emptyDir
-	if r.needDeployPVC(m.Spec.StorageName) {
-		dataVolume := corev1.PersistentVolumeClaimVolumeSource{
-			ClaimName: m.Name,
-		}
-		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: baseCodeVolume,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &dataVolume,
-			},
-		})
-	} else {
-		volumeQuantity, _ := resourcev1.ParseQuantity(m.Spec.StorageSize)
-		dataVolume := corev1.EmptyDirVolumeSource{
-			SizeLimit: &volumeQuantity,
-		}
-		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: baseCodeVolume,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &dataVolume,
-			},
-		})
-	}
-	//https will be disabled no matter secret is provided or not. we also export same port here.
-	for index, con := range dep.Spec.Template.Spec.Containers {
-		if con.Name == CSNAME {
-			dep.Spec.Template.Spec.Containers[index].Env = append(
-				dep.Spec.Template.Spec.Containers[index].Env, corev1.EnvVar{
-					Name:  "GOTTY_PORT",
-					Value: strconv.Itoa(HttpPort),
-				})
-			dep.Spec.Template.Spec.Containers[index].Ports = append(
-				dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
-					ContainerPort: HttpPort,
+					ContainerPort: int32(containerPort.IntValue()),
 					Name:          "http",
-				})
-			dep.Spec.Template.Spec.Containers[index].Ports = append(
-				dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
-					ContainerPort: UserPort,
-					Name:          "user",
 				})
 		}
 	}
@@ -1173,11 +1033,6 @@ func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer, secret
 					ContainerPort: HttpPort,
 					Name:          "http",
 				})
-			dep.Spec.Template.Spec.Containers[index].Ports = append(
-				dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
-					ContainerPort: UserPort,
-					Name:          "user",
-				})
 		}
 	}
 	// Append ingress and egress limit
@@ -1225,12 +1080,6 @@ func (r *CodeServerReconciler) newService(m *csv1alpha1.CodeServer, secret *core
 		Name:       "http",
 		Protocol:   corev1.ProtocolTCP,
 		TargetPort: r.getContainerPort(m),
-	})
-	ser.Spec.Ports = append(ser.Spec.Ports, corev1.ServicePort{
-		Port:       UserPort,
-		Name:       "user",
-		Protocol:   corev1.ProtocolTCP,
-		TargetPort: intstr.FromInt(UserPort),
 	})
 	// Set CodeServer instance as the owner of the Service.
 	controllerutil.SetControllerReference(m, ser, r.Scheme)

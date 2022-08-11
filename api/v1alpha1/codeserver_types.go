@@ -28,12 +28,10 @@ import (
 type RuntimeType string
 
 const (
-	// RuntimeGotty stands for application container.
+	// RuntimeGotty stands for application container. NOTE: use generic instead
 	RuntimeGotty RuntimeType = "gotty"
 	// RuntimeLxd stands for system container.
 	RuntimeLxd RuntimeType = "lxd"
-	// RuntimeVM stands for virtual machine.
-	RuntimeVM RuntimeType = "vm"
 	// RuntimeCode stands for VS code.
 	RuntimeCode RuntimeType = "code"
 	// RuntimePGWeb stands for PGWeb instance. NOTE: use generic instead

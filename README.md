@@ -11,7 +11,7 @@ kind: CodeServer
 metadata:
   name: codeserver-for-gotty-terminal
 spec:
-  runtime: gotty
+  runtime: generic
   subdomain: codeservertommy
   image: "opensourceway/openeuler-20.03-lts-sp1-base:latest"
   storageSize: "100Mi"
@@ -22,6 +22,7 @@ spec:
   egressBandwidth: "10M"
   inactiveAfterSeconds: 12000
   recycleAfterSeconds: 24000
+  containerPort: "8080"
   workspaceLocation: "/workspace"
   envs:
     - name: GOTTY_ONLY_ENABLE_BACKEND_WS_SERVER
@@ -38,6 +39,8 @@ spec:
       value: ".*"
     - name: GOTTY_PERMIT_WRITE
       value: "true"
+    - name: GOTTY_PORT
+      value: "8080"
   args:
     - zsh
   connectProbe: "/active-time"
@@ -130,7 +133,7 @@ metadata:
   name: pgweb-server
   namespace: default
 spec:
-  runtime: pgweb
+  runtime: generic
   subdomain: pgweb-server-sample
   image: "opensourceway/opengauss-pgweb:0.0.5"
   inactiveAfterSeconds: 0
@@ -146,6 +149,7 @@ spec:
       /usr/bin/pgweb --bind=0.0.0.0 --listen=8080 --url "postgres://opengauss:openGauss2022@0.0.0.0:5432/postgres?sslmode=disable"
   connectProbe: "/"
   privileged: false
+  containerPort: "8080"
   resources:
     requests:
       cpu: "1"
