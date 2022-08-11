@@ -87,6 +87,9 @@ type CodeServerSpec struct {
 	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty" protobuf:"bytes,19,opt,name=readinessProbe"`
 	// Specifies the terminal container port for connection, defaults in 8080.
 	ContainerPort string `json:"containerPort,omitempty" protobuf:"bytes,20,opt,name=containerPort"`
+	// Specifies the connectionString for frontend to connect, MUST within to string placeholder for subdomain and
+	// hostname, for example https://%s.%s/terminal or wss://%s.%s/ws, NOTE, tls MUST be enabled
+	ConnectionString string `json:"connectionString,omitempty" protobuf:"bytes,21,opt,name=connectionString"`
 }
 
 // ServerConditionType describes the type of state of code server condition

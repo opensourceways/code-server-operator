@@ -61,10 +61,11 @@ func (cs *CodeServerWatcher) inActiveCodeServer(req types.NamespacedName) {
 	if !HasCondition(codeServer.Status, csv1alpha1.ServerInactive) && !HasCondition(codeServer.Status, csv1alpha1.ServerRecycled) {
 		inactiveCondition := NewStateCondition(csv1alpha1.ServerInactive,
 			"code server has been marked inactive", map[string]string{}, corev1.ConditionTrue)
-		SetCondition(&codeServer.Status, inactiveCondition)
-		err := cs.Client.Update(context.TODO(), codeServer)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update code server status.")
+		if SetCondition(&codeServer.Status, inactiveCondition) {
+			err := cs.Client.Update(context.TODO(), codeServer)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update code server status.")
+			}
 		}
 	}
 }
@@ -82,10 +83,11 @@ func (cs *CodeServerWatcher) recycleCodeServer(req types.NamespacedName) {
 	if !HasCondition(codeServer.Status, csv1alpha1.ServerRecycled) {
 		recycleCondition := NewStateCondition(csv1alpha1.ServerRecycled,
 			"code server has been marked recycled", map[string]string{}, corev1.ConditionTrue)
-		SetCondition(&codeServer.Status, recycleCondition)
-		err := cs.Client.Update(context.TODO(), codeServer)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update code server status.")
+		if SetCondition(&codeServer.Status, recycleCondition) {
+			err := cs.Client.Update(context.TODO(), codeServer)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update code server status.")
+			}
 		}
 	}
 }

@@ -4,7 +4,7 @@ metadata:
   name: codeserver-gotty
   namespace: default
 spec:
-  runtime: gotty
+  runtime: generic
   subdomain: codeservergotty
   image: "opensourceway/openeuler-20.03-lts-sp2-base:latest@sha256:87d1b8918ea690badf55349a63b4766f720f9297dff72ff7965f93b7b02ef5a5"
   storageSize: "1Gi"
@@ -50,3 +50,4 @@ spec:
     limits:
       cpu: 500m
       memory: 500Mi
+  connectionString: "wss://%s.%s/ws"

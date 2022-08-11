@@ -159,43 +159,46 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		var service *corev1.Service
 		var deployment *appsv1.Deployment
 		var condition csv1alpha1.ServerCondition
-		// 0/5 check whether we need enable https
-		tlsSecret := r.findLegalCertSecrets(codeServer.Name, codeServer.Namespace, r.Options.HttpsSecretName)
-		// check LxdClientSecretName secret if needed
-		if strings.EqualFold(string(codeServer.Spec.Runtime), string(csv1alpha1.RuntimeLxd)) {
-			if len(r.Options.LxdClientSecretName) == 0 || r.findLegalCertSecrets(
-				codeServer.Name, codeServer.Namespace, r.Options.LxdClientSecretName) == nil {
-				failed = errrorlib.New(fmt.Sprintf("unable to find lxd client secret %s for lxd instance",
-					r.Options.LxdClientSecretName))
+		// 0/5 check whether tls secret exists
+		_, failed = r.findLegalCertSecrets(codeServer.Name, codeServer.Namespace, r.Options.HttpsSecretName)
+		if failed == nil {
+			// check LxdClientSecretName secret if needed
+			if strings.EqualFold(string(codeServer.Spec.Runtime), string(csv1alpha1.RuntimeLxd)) {
+				if len(r.Options.LxdClientSecretName) == 0 {
+					_, failed = r.findLegalCertSecrets(codeServer.Name, codeServer.Namespace, r.Options.LxdClientSecretName)
+				}
 			}
 		}
 		// 1/5: reconcile PVC
-		if r.needDeployPVC(codeServer.Spec.StorageName) {
-			_, failed = r.reconcileForPVC(codeServer)
+		if failed == nil {
+			if r.needDeployPVC(codeServer.Spec.StorageName) {
+				_, failed = r.reconcileForPVC(codeServer)
+			}
 		}
 		// 2/5: reconcile service
 		if failed == nil {
-			service, failed = r.reconcileForService(codeServer, tlsSecret)
+			service, failed = r.reconcileForService(codeServer)
 		}
 		// 3/5:reconcile ingress
 		if failed == nil {
-			_, failed = r.reconcileForIngress(codeServer, tlsSecret)
+			_, failed = r.reconcileForIngress(codeServer)
 		}
 		// 4/5: reconcile deployment
 		if failed == nil {
-			deployment, failed = r.reconcileForDeployment(codeServer, tlsSecret)
+			deployment, failed = r.reconcileForDeployment(codeServer)
 		}
 		// 5/5: update code server status
+		createCondition := false
 		if !HasCondition(codeServer.Status, csv1alpha1.ServerCreated) {
 			createdCondition := NewStateCondition(csv1alpha1.ServerCreated,
 				"code server has been accepted", map[string]string{}, corev1.ConditionTrue)
-			SetCondition(&codeServer.Status, createdCondition)
+			createCondition = SetCondition(&codeServer.Status, createdCondition)
 		}
 		if failed == nil {
 			condition = NewStateCondition(csv1alpha1.ServerReady,
 				"code server now available", map[string]string{}, corev1.ConditionTrue)
 			if !HasDeploymentCondition(deployment.Status, appsv1.DeploymentAvailable) || !r.serverReady(
-				codeServer, tlsSecret) {
+				codeServer) {
 				condition.Status = corev1.ConditionFalse
 				condition.Reason = "waiting deployment to be available and endpoint ready"
 				//only when deployment is ready while server unready, try to watch it later
@@ -206,10 +209,10 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			} else {
 				//add it to watch list
 				var endPoint string
-				// No matter tls is enabled or nor we both expose upstream via http
+				// No matter tls is enabled or nor we both expose upstream via http for internal probe
 				endPoint = fmt.Sprintf("http://%s:%d/%s", service.Spec.ClusterIP, HttpPort,
 					strings.TrimLeft(codeServer.Spec.ConnectProbe, "/"))
-				condition.Message[InstanceEndpoint] = r.getInstanceEndpoint(codeServer, tlsSecret)
+				condition.Message[InstanceEndpoint] = r.getInstanceEndpoint(codeServer)
 
 				boundStatus := GetCondition(codeServer.Status, csv1alpha1.ServerBound)
 				if (codeServer.Spec.InactiveAfterSeconds == nil) || *codeServer.Spec.InactiveAfterSeconds < 0 || *codeServer.Spec.InactiveAfterSeconds >= MaxActiveSeconds {
@@ -235,25 +238,28 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			condition = NewStateCondition(csv1alpha1.ServerErrored,
 				"code server errored", map[string]string{"detail": failed.Error()}, corev1.ConditionTrue)
 		}
-		SetCondition(&codeServer.Status, condition)
+		updateCondition := SetCondition(&codeServer.Status, condition)
+		boundCondition := false
 		//if it's ready and missing server bound status, add default condition here.
 		if HasCondition(codeServer.Status, csv1alpha1.ServerReady) && MissingCondition(
 			codeServer.Status, csv1alpha1.ServerBound) {
 			additionCondition := NewStateCondition(csv1alpha1.ServerBound,
 				"code server waiting to be bound", map[string]string{}, corev1.ConditionFalse)
-			SetCondition(&codeServer.Status, additionCondition)
+			boundCondition = SetCondition(&codeServer.Status, additionCondition)
 		}
-		updateStatus := codeServer.Status
-		err = r.Client.Get(context.TODO(), req.NamespacedName, codeServer)
-		if err != nil {
-			reqLogger.Error(err, "Failed to get CoderServer object for update.")
-			return reconcile.Result{Requeue: true}, err
-		}
-		codeServer.Status = updateStatus
-		err = r.Client.Update(context.TODO(), codeServer)
-		if err != nil {
-			reqLogger.Error(err, "Failed to update code server status.")
-			return reconcile.Result{Requeue: true}, nil
+		if createCondition || updateCondition || boundCondition {
+			updateStatus := codeServer.Status
+			err = r.Client.Get(context.TODO(), req.NamespacedName, codeServer)
+			if err != nil {
+				reqLogger.Error(err, "Failed to get CoderServer object for update.")
+				return reconcile.Result{Requeue: true}, err
+			}
+			codeServer.Status = updateStatus
+			err = r.Client.Update(context.TODO(), codeServer)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update code server status.")
+				return reconcile.Result{Requeue: true}, nil
+			}
 		}
 		if failed != nil {
 			return reconcile.Result{
@@ -286,7 +292,7 @@ func (r *CodeServerReconciler) deleteFromInactiveWatch(resource types.Namespaced
 	r.ReqCh <- request
 }
 
-func (r *CodeServerReconciler) findLegalCertSecrets(name, namespace, secretName string) *corev1.Secret {
+func (r *CodeServerReconciler) findLegalCertSecrets(name, namespace, secretName string) (*corev1.Secret, error) {
 	reqLogger := r.Log.WithValues("namespace", namespace, "name", name)
 	tlsSecret := &corev1.Secret{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: secretName, Namespace: namespace}, tlsSecret)
@@ -294,18 +300,18 @@ func (r *CodeServerReconciler) findLegalCertSecrets(name, namespace, secretName 
 		if _, ok := tlsSecret.Data[corev1.TLSCertKey]; !ok {
 			reqLogger.Info(
 				fmt.Sprintf("could not found secret key %s in secret %s", corev1.TLSCertKey, secretName))
-			return nil
+			return nil, errrorlib.New(fmt.Sprintf("could not found secret key %s in secret %s", corev1.TLSCertKey, secretName))
 		}
 		if _, ok := tlsSecret.Data[corev1.TLSPrivateKeyKey]; !ok {
 			reqLogger.Info(
 				fmt.Sprintf("could not found secret key %s in secret %s", corev1.TLSPrivateKeyKey, secretName))
-			return nil
+			return nil, errrorlib.New(fmt.Sprintf("could not found secret key %s in secret %s", corev1.TLSPrivateKeyKey, secretName))
 		}
 		reqLogger.Info(fmt.Sprintf("found secret %s in cluster", secretName))
-		return tlsSecret
+		return tlsSecret, nil
 	}
-	reqLogger.Info(fmt.Sprintf("could not found secret %s in cluster", secretName))
-	return nil
+	reqLogger.Info(fmt.Sprintf("could not found secret %s in cluster, reconciling related code server in this namespace will be disabled.", secretName))
+	return nil, err
 }
 
 func (r *CodeServerReconciler) addToRecycleWatch(resource types.NamespacedName, duration int64, inactivetime metav1.Time) {
@@ -419,17 +425,12 @@ func (r *CodeServerReconciler) reconcileForPVC(codeServer *csv1alpha1.CodeServer
 	return oldPvc, nil
 }
 
-func (r *CodeServerReconciler) serverReady(codeServer *csv1alpha1.CodeServer, secret *corev1.Secret) bool {
+func (r *CodeServerReconciler) serverReady(codeServer *csv1alpha1.CodeServer) bool {
 	reqLogger := r.Log.WithValues("namespace", codeServer.Namespace, "name", codeServer.Name)
 	reqLogger.Info("Waiting Service Ready.")
 	instEndpoint := ""
-	if secret == nil {
-		instEndpoint = fmt.Sprintf("http://%s.%s/%s", codeServer.Spec.Subdomain, r.Options.DomainName,
-			strings.TrimLeft(codeServer.Spec.ConnectProbe, "/"))
-	} else {
-		instEndpoint = fmt.Sprintf("https://%s.%s/%s", codeServer.Spec.Subdomain, r.Options.DomainName,
-			strings.TrimLeft(codeServer.Spec.ConnectProbe, "/"))
-	}
+	instEndpoint = fmt.Sprintf("https://%s.%s/%s", codeServer.Spec.Subdomain, r.Options.DomainName,
+		strings.TrimLeft(codeServer.Spec.ConnectProbe, "/"))
 	resp, err := http.Get(instEndpoint)
 	if err != nil {
 		reqLogger.Error(err, fmt.Sprintf("failed to detect instance endpoint for code server %s",
@@ -443,11 +444,11 @@ func (r *CodeServerReconciler) serverReady(codeServer *csv1alpha1.CodeServer, se
 		codeServer.Name, resp.StatusCode, instEndpoint))
 	return false
 }
-func (r *CodeServerReconciler) reconcileForDeployment(codeServer *csv1alpha1.CodeServer, secret *corev1.Secret) (*appsv1.Deployment, error) {
+func (r *CodeServerReconciler) reconcileForDeployment(codeServer *csv1alpha1.CodeServer) (*appsv1.Deployment, error) {
 	reqLogger := r.Log.WithValues("namespace", codeServer.Namespace, "name", codeServer.Name)
 	reqLogger.Info("Reconciling Deployment.")
 	//reconcile pvc for code server
-	newDev, err := r.newDeployment(codeServer, secret)
+	newDev, err := r.newDeployment(codeServer)
 	if err != nil {
 		reqLogger.Error(err, "Failed to generate Deployment.")
 		return nil, err
@@ -480,11 +481,11 @@ func (r *CodeServerReconciler) reconcileForDeployment(codeServer *csv1alpha1.Cod
 	return oldDev, nil
 }
 
-func (r *CodeServerReconciler) reconcileForIngress(codeServer *csv1alpha1.CodeServer, secret *corev1.Secret) (*extv1.Ingress, error) {
+func (r *CodeServerReconciler) reconcileForIngress(codeServer *csv1alpha1.CodeServer) (*extv1.Ingress, error) {
 	reqLogger := r.Log.WithValues("namespace", codeServer.Namespace, "name", codeServer.Name)
 	reqLogger.Info("Reconciling ingress.")
 	//reconcile ingress for code server
-	newIngress := r.NewIngress(codeServer, secret)
+	newIngress := r.NewIngress(codeServer)
 	oldIngress := &extv1.Ingress{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf(TerminalIngress, codeServer.Name), Namespace: codeServer.Namespace}, oldIngress)
 	if err != nil && errors.IsNotFound(err) {
@@ -514,11 +515,11 @@ func (r *CodeServerReconciler) reconcileForIngress(codeServer *csv1alpha1.CodeSe
 	return oldIngress, nil
 }
 
-func (r *CodeServerReconciler) reconcileForService(codeServer *csv1alpha1.CodeServer, secret *corev1.Secret) (*corev1.Service, error) {
+func (r *CodeServerReconciler) reconcileForService(codeServer *csv1alpha1.CodeServer) (*corev1.Service, error) {
 	reqLogger := r.Log.WithValues("namespace", codeServer.Namespace, "name", codeServer.Name)
 	reqLogger.Info("Reconciling service.")
 	//reconcile service for code server
-	newService := r.newService(codeServer, secret)
+	newService := r.newService(codeServer)
 	oldService := &corev1.Service{}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: codeServer.Name, Namespace: codeServer.Namespace}, oldService)
 	if err != nil && errors.IsNotFound(err) {
@@ -572,43 +573,35 @@ func (r *CodeServerReconciler) addInitContainersForDeployment(m *csv1alpha1.Code
 	return containers
 }
 
-func (r *CodeServerReconciler) newDeployment(m *csv1alpha1.CodeServer, secret *corev1.Secret) (*appsv1.Deployment, error) {
+func (r *CodeServerReconciler) newDeployment(m *csv1alpha1.CodeServer) (*appsv1.Deployment, error) {
 	instanceRuntime := string(m.Spec.Runtime)
 	if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeCode)) {
 		//Create code server environment with vs code
-		return r.deploymentForVSCodeServer(m, secret), nil
+		return r.deploymentForVSCodeServer(m), nil
 	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGotty)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimePGWeb)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGeneric)) {
-		//Create code server environment with gotty based terminal
-		return r.deploymentForGeneric(m, secret), nil
+		//Create code server environment with generic container
+		return r.deploymentForGeneric(m), nil
 	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeLxd)) {
 		//Create code server environment with gotty based terminal which runs on lxd
-		return r.deploymentForLxd(m, secret), nil
+		return r.deploymentForLxd(m), nil
 	} else {
 		return nil, errrorlib.New(fmt.Sprintf("unsupported runtime %s", m.Spec.Runtime))
 	}
 }
 
-func (r *CodeServerReconciler) getInstanceEndpoint(m *csv1alpha1.CodeServer, tlsSecret *corev1.Secret) string {
+func (r *CodeServerReconciler) getInstanceEndpoint(m *csv1alpha1.CodeServer) string {
 	instanceRuntime := string(m.Spec.Runtime)
-	// https not configured
-	if tlsSecret == nil {
-		//websocket
-		if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGotty)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeLxd)) {
-			return fmt.Sprintf("ws://%s.%s/ws", m.Spec.Subdomain, r.Options.DomainName)
-		} else {
-			return fmt.Sprintf("http://%s.%s/", m.Spec.Subdomain, r.Options.DomainName)
-		}
+	if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGotty)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeLxd)) {
+		return fmt.Sprintf("wss://%s.%s/ws", m.Spec.Subdomain, r.Options.DomainName)
+	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGeneric)) {
+		return fmt.Sprintf(m.Spec.ConnectionString, m.Spec.Subdomain, r.Options.DomainName)
 	} else {
-		if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeGotty)) || strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeLxd)) {
-			return fmt.Sprintf("wss://%s.%s/ws", m.Spec.Subdomain, r.Options.DomainName)
-		} else {
-			return fmt.Sprintf("https://%s.%s/", m.Spec.Subdomain, r.Options.DomainName)
-		}
+		return fmt.Sprintf("https://%s.%s/", m.Spec.Subdomain, r.Options.DomainName)
 	}
 }
 
 // deploymentForVSCodeServer returns a code server with VSCode Deployment object
-func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServer, secret *corev1.Secret) *appsv1.Deployment {
+func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServer) *appsv1.Deployment {
 	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	baseCodeDir := "/home/coder/project"
 	baseCodeVolume := "code-server-project-dir"
@@ -741,7 +734,7 @@ func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServe
 }
 
 // deploymentForGeneric returns a code server with generic temporary environments
-func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer, secret *corev1.Secret) *appsv1.Deployment {
+func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *appsv1.Deployment {
 	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	ls := appLabel(m.Name)
 	baseCodeDir := r.getDefaultWorkSpace(m)
@@ -946,7 +939,7 @@ func (r *CodeServerReconciler) assembleBaseLxdEnvs(
 }
 
 // deploymentForLxd returns an instance with gotty based terminal on lxd Deployment object for lxc launcher
-func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer, secret *corev1.Secret) *appsv1.Deployment {
+func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer) *appsv1.Deployment {
 	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	ls := appLabel(m.Name)
 	baseProxyDir := r.getDefaultWorkSpace(m)
@@ -1067,7 +1060,7 @@ func (r *CodeServerReconciler) getDefaultWorkSpace(m *csv1alpha1.CodeServer) str
 }
 
 // newService function takes in a CodeServer object and returns a Service for that object.
-func (r *CodeServerReconciler) newService(m *csv1alpha1.CodeServer, secret *corev1.Secret) *corev1.Service {
+func (r *CodeServerReconciler) newService(m *csv1alpha1.CodeServer) *corev1.Service {
 	ls := appLabel(m.Name)
 	ser := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1124,7 +1117,7 @@ func (r *CodeServerReconciler) newPVC(m *csv1alpha1.CodeServer) (*corev1.Persist
 }
 
 // NewIngress function takes in a CodeServer object and returns an ingress for that object.
-func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer, secret *corev1.Secret) *extv1.Ingress {
+func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *extv1.Ingress {
 	servicePort := intstr.FromInt(HttpPort)
 	httpValue := extv1.HTTPIngressRuleValue{
 		Paths: []extv1.HTTPIngressPath{
@@ -1141,7 +1134,7 @@ func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer, secret *core
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        fmt.Sprintf(TerminalIngress, m.Name),
 			Namespace:   m.Namespace,
-			Annotations: r.annotationsForIngress(m, secret),
+			Annotations: r.annotationsForIngress(),
 		},
 		Spec: extv1.IngressSpec{
 			Rules: []extv1.IngressRule{
@@ -1154,22 +1147,20 @@ func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer, secret *core
 			},
 		},
 	}
-	if secret != nil {
-		ingress.Spec.TLS = []extv1.IngressTLS{
-			{
-				Hosts:      []string{fmt.Sprintf("%s.%s", m.Spec.Subdomain, r.Options.DomainName)},
-				SecretName: r.Options.HttpsSecretName,
-			},
-		}
+	ingress.Spec.TLS = []extv1.IngressTLS{
+		{
+			Hosts:      []string{fmt.Sprintf("%s.%s", m.Spec.Subdomain, r.Options.DomainName)},
+			SecretName: r.Options.HttpsSecretName,
+		},
 	}
 	// Set CodeServer instance as the owner of the ingress.
 	controllerutil.SetControllerReference(m, ingress, r.Scheme)
 	return ingress
 }
 
-func (r *CodeServerReconciler) annotationsForIngress(m *csv1alpha1.CodeServer, secret *corev1.Secret) map[string]string {
+func (r *CodeServerReconciler) annotationsForIngress() map[string]string {
 	annotation := map[string]string{}
-	// currently, we don't enable https
+	// currently, we don't enable https for backend
 	//annotation["nginx.ingress.kubernetes.io/secure-backends"] = "true"
 	//annotation["nginx.ingress.kubernetes.io/backend-protocol"] = "HTTPS"
 
@@ -1237,13 +1228,13 @@ func GetCondition(status csv1alpha1.CodeServerStatus, condType csv1alpha1.Server
 }
 
 // SetCondition updates the code server status with provided condition
-func SetCondition(status *csv1alpha1.CodeServerStatus, condition csv1alpha1.ServerCondition) {
+func SetCondition(status *csv1alpha1.CodeServerStatus, condition csv1alpha1.ServerCondition) bool {
 
 	currentCond := GetCondition(*status, condition.Type)
 
 	// Do nothing if condition doesn't change
 	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
-		return
+		return false
 	}
 
 	// Do not update lastTransitionTime if the status of the condition doesn't change.
@@ -1254,6 +1245,7 @@ func SetCondition(status *csv1alpha1.CodeServerStatus, condition csv1alpha1.Serv
 	// Append the updated condition to the job status
 	newConditions := filterOutCondition(status, condition)
 	status.Conditions = append(newConditions, condition)
+	return true
 }
 
 func filterOutCondition(states *csv1alpha1.CodeServerStatus, currentCondition csv1alpha1.ServerCondition) []csv1alpha1.ServerCondition {

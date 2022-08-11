@@ -29,10 +29,4 @@ spec:
       cd /workspace/content
       pip install -r requirements.txt
       exec python3 launch.py
-  initPlugins:
-    obs-clone:
-      - --source=xihe-obj/models/wesley/lenet_mnist/
-      - --obs-ak=<ak>
-      - --obs-sk=<sk>
-      - --obs-bucketname=obs-xihe-beijing4-test
-      - --obs-endpoint=obs.cn-north-4.myhuaweicloud.com
+  connectionString: "https://%s.%s/"
