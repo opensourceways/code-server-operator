@@ -3,6 +3,60 @@
 
 This project used to launch multiple code server instances in k8s cluster.
 there are three main code server types supported currently.
+
+# Spec introduction
+Definition of code server spec are describe below
+```go
+// CodeServerSpec defines the desired state of CodeServer
+type CodeServerSpec struct {
+	// Runtime specifies the different server runtime, 'lxd', 'code' and 'generic' are supported currently supported, for most of the container applications, generic is enough.
+	Runtime RuntimeType `json:"runtime,omitempty" protobuf:"bytes,1,opt,name=runtime"`
+	// Specifies the additional storage to be mounted in the location of 'WorkspaceLocation', use this with the combination of 'WorkspaceLocation' and 'StorageName'.
+	StorageSize string `json:"storageSize,omitempty" protobuf:"bytes,2,opt,name=storageSize"`
+	// Specifies the storage name for the workspace volume possible values are available sc name or 'emptyDir'
+	StorageName string `json:"storageName,omitempty" protobuf:"bytes,3,opt,name=storageName"`
+	// Specifies the additional annotations for persistent volume claim
+	StorageAnnotations map[string]string `json:"storageAnnotations,omitempty" protobuf:"bytes,4,opt,name=storageAnnotations"`
+	// Specifies workspace location.
+	WorkspaceLocation string `json:"workspaceLocation,omitempty" protobuf:"bytes,5,opt,name=workspaceLocation"`
+	// Specifies the resource requirements for code server pod.
+	Resources v1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,6,opt,name=resources"`
+	// Specifies ingress bandwidth for code server
+	IngressBandwidth string `json:"ingressBandwidth,omitempty" protobuf:"bytes,7,opt,name=ingressBandwidth"`
+	// Specifies egress bandwidth for code server
+	EgressBandwidth string `json:"egressBandwidth,omitempty" protobuf:"bytes,8,opt,name=egressBandwidth"`
+	// Specifies the period before controller inactive the resource (delete all resources except volume).
+	InactiveAfterSeconds *int64 `json:"inactiveAfterSeconds,omitempty" protobuf:"bytes,9,opt,name=inactiveAfterSeconds"`
+	// Specifies the period before controller recycle the resource (delete all resources).
+	RecycleAfterSeconds *int64 `json:"recycleAfterSeconds,omitempty" protobuf:"bytes,10,opt,name=recycleAfterSeconds"`
+	// Specifies the subdomain for pod visiting
+	Subdomain string `json:"subdomain,omitempty" protobuf:"bytes,11,opt,name=subdomain"`
+	// Specifies the envs of container
+	Envs []v1.EnvVar `json:"envs,omitempty" protobuf:"bytes,12,opt,name=envs"`
+	// Specifies the command of container, only work in generic
+	Command []string `json:"command,omitempty" protobuf:"bytes,13,rep,name=command"`
+	// Specifies the Args of container, will be ignored if command specified, only work in generic
+	Args []string `json:"args,omitempty" protobuf:"bytes,14,opt,name=args"`
+	// Specifies the image used to running code server
+	Image string `json:"image,omitempty" protobuf:"bytes,15,opt,name=image"`
+	// Specifies the alive probe to detect whether pod is connected. Only http path are supported and time should be in
+	// the format of 2006-01-02T15:04:05.000Z. if 'InactiveAfterSeconds' is none-zero, code server controller will use the
+	// latest time collected from 'ConnectProbe' to decide whether should inactive the instance.
+	ConnectProbe string `json:"connectProbe,omitempty" protobuf:"bytes,16,opt,name=connectProbe"`
+	// Whether to enable pod privileged
+	Privileged *bool `json:"privileged,omitempty" protobuf:"bytes,17,opt,name=privileged"`
+	// Specifies the init plugins that will be running to finish before code server running. currently, only git plugin supported.
+	InitPlugins map[string][]string `json:"initPlugins,omitempty" protobuf:"bytes,18,opt,name=initPlugins"`
+	// Specifies the node selector for scheduling.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,19,opt,name=nodeSelector"`
+	// Specifies the liveness Probe.
+	LivenessProbe *v1.Probe `json:"livenessProbe,omitempty" protobuf:"bytes,20,opt,name=livenessProbe"`
+	// Specifies the readiness Probe.
+	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty" protobuf:"bytes,19,opt,name=readinessProbe"`
+	// Specifies the terminal container port for connection, defaults in 8080.
+	ContainerPort string `json:"containerPort,omitempty" protobuf:"bytes,20,opt,name=containerPort"`
+}
+```
 ## Gotty based web terminal
 This code server used to launch gotty based terminal in docker container, the example of CRD yaml is:
 ```shell

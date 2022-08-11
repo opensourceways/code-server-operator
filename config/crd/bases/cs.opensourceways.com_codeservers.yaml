@@ -37,7 +37,7 @@ spec:
             description: CodeServerSpec defines the desired state of CodeServer
             properties:
               args:
-                description: Specifies the envs
+                description: Specifies the args, will be ignored if command specified
                 items:
                   type: string
                 type: array

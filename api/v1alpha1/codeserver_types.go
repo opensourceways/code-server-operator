@@ -68,7 +68,7 @@ type CodeServerSpec struct {
 	Envs []v1.EnvVar `json:"envs,omitempty" protobuf:"bytes,12,opt,name=envs"`
 	// Specifies the command
 	Command []string `json:"command,omitempty" protobuf:"bytes,13,rep,name=command"`
-	// Specifies the envs
+	// Specifies the args, will be ignored if command specified
 	Args []string `json:"args,omitempty" protobuf:"bytes,14,opt,name=args"`
 	// Specifies the image used to running code server
 	Image string `json:"image,omitempty" protobuf:"bytes,15,opt,name=image"`

@@ -786,8 +786,6 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer, se
 							Image:           m.Spec.Image,
 							Name:            CSNAME,
 							Env:             m.Spec.Envs,
-							Args:            m.Spec.Args,
-							Command:         m.Spec.Command,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: &priviledged,
 							VolumeMounts: []corev1.VolumeMount{
@@ -831,6 +829,11 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer, se
 	//https will be disabled no matter secret is provided or not. we also export same port here.
 	for index, con := range dep.Spec.Template.Spec.Containers {
 		if con.Name == CSNAME {
+			if len(m.Spec.Command) != 0 {
+				dep.Spec.Template.Spec.Containers[index].Command = m.Spec.Command
+			} else if len(m.Spec.Args) != 0 {
+				dep.Spec.Template.Spec.Containers[index].Args = m.Spec.Args
+			}
 			containerPort := r.getContainerPort(m)
 			dep.Spec.Template.Spec.Containers[index].Ports = append(
 				dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
