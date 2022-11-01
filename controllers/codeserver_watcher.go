@@ -19,15 +19,16 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/go-logr/logr"
 	"io/ioutil"
+	"net/http"
+	"strings"
+
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strings"
 
 	"time"
 
@@ -62,7 +63,7 @@ func (cs *CodeServerWatcher) inActiveCodeServer(req types.NamespacedName) {
 		inactiveCondition := NewStateCondition(csv1alpha1.ServerInactive,
 			"code server has been marked inactive", map[string]string{}, corev1.ConditionTrue)
 		if SetCondition(&codeServer.Status, inactiveCondition) {
-			err := cs.Client.Update(context.TODO(), codeServer)
+			err := cs.Client.Status().Update(context.TODO(), codeServer)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update code server status.")
 			}
@@ -84,7 +85,7 @@ func (cs *CodeServerWatcher) recycleCodeServer(req types.NamespacedName) {
 		recycleCondition := NewStateCondition(csv1alpha1.ServerRecycled,
 			"code server has been marked recycled", map[string]string{}, corev1.ConditionTrue)
 		if SetCondition(&codeServer.Status, recycleCondition) {
-			err := cs.Client.Update(context.TODO(), codeServer)
+			err := cs.Client.Status().Update(context.TODO(), codeServer)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update code server status.")
 			}
