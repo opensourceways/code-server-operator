@@ -17,9 +17,10 @@ limitations under the License.
 package controllers
 
 import (
+	"sync"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sync"
 )
 
 type CodeServerRecycleCache struct {
@@ -37,8 +38,10 @@ func (c *CodeServerRecycleCache) AddOrUpdate(req CodeServerRequest) {
 	c.Lock()
 	defer c.Unlock()
 	if obj, found := c.Caches[req.resource.String()]; found {
-		obj.Duration = req.duration
-		obj.LastInactiveTime = req.inactiveTime
+		if req.increaseRecycleSeconds {
+			obj.Duration = obj.Duration + req.duration
+			c.Caches[req.resource.String()] = obj
+		}
 	} else {
 		c.Caches[req.resource.String()] = CodeServerRecycleStatus{
 			Duration:         req.duration,

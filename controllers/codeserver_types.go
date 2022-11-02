@@ -43,9 +43,10 @@ const (
 )
 
 type CodeServerRequest struct {
-	resource     types.NamespacedName
-	duration     int64
-	operate      WatchType
-	endpoint     string
-	inactiveTime metav1.Time
+	resource               types.NamespacedName
+	duration               int64
+	operate                WatchType
+	endpoint               string
+	inactiveTime           metav1.Time
+	increaseRecycleSeconds bool
 }

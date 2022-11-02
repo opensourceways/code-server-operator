@@ -90,6 +90,8 @@ type CodeServerSpec struct {
 	// Specifies the connectionString for frontend to connect, MUST within to string placeholder for subdomain and
 	// hostname, for example https://%s.%s/terminal or wss://%s.%s/ws, NOTE, tls MUST be enabled
 	ConnectionString string `json:"connectionString,omitempty" protobuf:"bytes,21,opt,name=connectionString"`
+	// whether to increase the life cycle time
+	IncreaseRecycleSeconds bool `json:"increaseRecycleSeconds,omitempty" protobuf:"bytes,22,opt,name=increaseRecycleSeconds"`
 }
 
 // ServerConditionType describes the type of state of code server condition

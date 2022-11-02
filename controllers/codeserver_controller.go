@@ -20,6 +20,12 @@ import (
 	"context"
 	errrorlib "errors"
 	"fmt"
+	"net/http"
+	"path"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/go-logr/logr"
 	"github.com/opensourceways/code-server-operator/controllers/initplugins"
 	"github.com/opensourceways/code-server-operator/controllers/initplugins/interface"
@@ -33,16 +39,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"net/http"
-	"path"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"strconv"
-	"strings"
-	"time"
 
 	csv1alpha1 "github.com/opensourceways/code-server-operator/api/v1alpha1"
 )
@@ -115,11 +116,11 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			// we keep the instance within MaxKeepSeconds maximumly
 			reqLogger.Info(fmt.Sprintf("Code server will be recycled after %d seconds.",
 				MaxKeepSeconds))
-			r.addToRecycleWatch(req.NamespacedName, MaxKeepSeconds, inActiveCondition.LastTransitionTime)
+			r.addToRecycleWatch(req.NamespacedName, MaxKeepSeconds, inActiveCondition.LastTransitionTime, false)
 		} else {
 			reqLogger.Info(fmt.Sprintf("Code server will be recycled after %d seconds.",
 				*codeServer.Spec.RecycleAfterSeconds))
-			r.addToRecycleWatch(req.NamespacedName, *codeServer.Spec.RecycleAfterSeconds, inActiveCondition.LastTransitionTime)
+			r.addToRecycleWatch(req.NamespacedName, *codeServer.Spec.RecycleAfterSeconds, inActiveCondition.LastTransitionTime, false)
 		}
 		if err := r.deleteCodeServerResource(codeServer.Name, codeServer.Namespace, codeServer.Spec.StorageName,
 			false); err != nil {
@@ -137,13 +138,13 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				// we keep the instance within MaxKeepSeconds maximumly
 				reqLogger.Info(fmt.Sprintf("Code server will be recycled after %d seconds.",
 					MaxKeepSeconds))
-				r.addToRecycleWatch(req.NamespacedName, MaxKeepSeconds, current)
+				r.addToRecycleWatch(req.NamespacedName, MaxKeepSeconds, current, codeServer.Spec.IncreaseRecycleSeconds)
 			}
 		} else {
 			if boundStatus != nil && boundStatus.Status == corev1.ConditionTrue {
 				reqLogger.Info(fmt.Sprintf("Code server will be recycled after %d seconds.",
 					*codeServer.Spec.RecycleAfterSeconds))
-				r.addToRecycleWatch(req.NamespacedName, *codeServer.Spec.RecycleAfterSeconds, current)
+				r.addToRecycleWatch(req.NamespacedName, *codeServer.Spec.RecycleAfterSeconds, current, codeServer.Spec.IncreaseRecycleSeconds)
 			}
 		}
 	} else if HasCondition(codeServer.Status, csv1alpha1.ServerRecycled) {
@@ -255,7 +256,7 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return reconcile.Result{Requeue: true}, err
 			}
 			codeServer.Status = updateStatus
-			err = r.Client.Update(context.TODO(), codeServer)
+			err = r.Client.Status().Update(context.TODO(), codeServer)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update code server status.")
 				return reconcile.Result{Requeue: true}, nil
@@ -314,12 +315,13 @@ func (r *CodeServerReconciler) findLegalCertSecrets(name, namespace, secretName 
 	return nil, err
 }
 
-func (r *CodeServerReconciler) addToRecycleWatch(resource types.NamespacedName, duration int64, inactivetime metav1.Time) {
+func (r *CodeServerReconciler) addToRecycleWatch(resource types.NamespacedName, duration int64, inactivetime metav1.Time, increaseRecycleSeconds bool) {
 	request := CodeServerRequest{
-		resource:     resource,
-		operate:      AddRecycleWatch,
-		duration:     duration,
-		inactiveTime: inactivetime,
+		resource:               resource,
+		operate:                AddRecycleWatch,
+		duration:               duration,
+		inactiveTime:           inactivetime,
+		increaseRecycleSeconds: increaseRecycleSeconds,
 	}
 	r.ReqCh <- request
 }
