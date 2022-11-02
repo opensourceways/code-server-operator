@@ -110,18 +110,17 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	//case4. reconcile the code server.
 	if HasCondition(codeServer.Status, csv1alpha1.ServerInactive) && !HasCondition(codeServer.Status, csv1alpha1.ServerRecycled) {
 		//remove it from watch list and add it to recycle watch
-		flag := false
 		r.deleteFromInactiveWatch(req.NamespacedName)
 		inActiveCondition := GetCondition(codeServer.Status, csv1alpha1.ServerInactive)
 		if (codeServer.Spec.RecycleAfterSeconds == nil) || *codeServer.Spec.RecycleAfterSeconds <= 0 || *codeServer.Spec.RecycleAfterSeconds >= MaxKeepSeconds {
 			// we keep the instance within MaxKeepSeconds maximumly
 			reqLogger.Info(fmt.Sprintf("Code server will be recycled after %d seconds.",
 				MaxKeepSeconds))
-			r.addToRecycleWatch(req.NamespacedName, MaxKeepSeconds, inActiveCondition.LastTransitionTime, &flag)
+			r.addToRecycleWatch(req.NamespacedName, MaxKeepSeconds, inActiveCondition.LastTransitionTime, false)
 		} else {
 			reqLogger.Info(fmt.Sprintf("Code server will be recycled after %d seconds.",
 				*codeServer.Spec.RecycleAfterSeconds))
-			r.addToRecycleWatch(req.NamespacedName, *codeServer.Spec.RecycleAfterSeconds, inActiveCondition.LastTransitionTime, &flag)
+			r.addToRecycleWatch(req.NamespacedName, *codeServer.Spec.RecycleAfterSeconds, inActiveCondition.LastTransitionTime, false)
 		}
 		if err := r.deleteCodeServerResource(codeServer.Name, codeServer.Namespace, codeServer.Spec.StorageName,
 			false); err != nil {
@@ -316,7 +315,7 @@ func (r *CodeServerReconciler) findLegalCertSecrets(name, namespace, secretName 
 	return nil, err
 }
 
-func (r *CodeServerReconciler) addToRecycleWatch(resource types.NamespacedName, duration int64, inactivetime metav1.Time, increaseRecycleSeconds *bool) {
+func (r *CodeServerReconciler) addToRecycleWatch(resource types.NamespacedName, duration int64, inactivetime metav1.Time, increaseRecycleSeconds bool) {
 	request := CodeServerRequest{
 		resource:               resource,
 		operate:                AddRecycleWatch,

@@ -48,5 +48,5 @@ type CodeServerRequest struct {
 	operate                WatchType
 	endpoint               string
 	inactiveTime           metav1.Time
-	increaseRecycleSeconds *bool
+	increaseRecycleSeconds bool
 }

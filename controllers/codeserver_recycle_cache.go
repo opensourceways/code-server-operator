@@ -38,7 +38,7 @@ func (c *CodeServerRecycleCache) AddOrUpdate(req CodeServerRequest) {
 	c.Lock()
 	defer c.Unlock()
 	if obj, found := c.Caches[req.resource.String()]; found {
-		if *req.increaseRecycleSeconds {
+		if req.increaseRecycleSeconds {
 			obj.Duration = obj.Duration + req.duration
 			c.Caches[req.resource.String()] = obj
 		}
