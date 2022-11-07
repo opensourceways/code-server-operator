@@ -256,7 +256,7 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 				return reconcile.Result{Requeue: true}, err
 			}
 			codeServer.Status = updateStatus
-			err = r.Client.Status().Update(context.TODO(), codeServer)
+			err = r.Client.Update(context.TODO(), codeServer)
 			if err != nil {
 				reqLogger.Error(err, "Failed to update code server status.")
 				return reconcile.Result{Requeue: true}, nil
