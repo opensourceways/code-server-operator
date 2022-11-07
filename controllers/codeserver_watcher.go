@@ -98,6 +98,7 @@ func NewCodeServerWatcher(client client.Client, log logr.Logger, schema *runtime
 	cache := CodeServerActiveCache{}
 	cache.InactiveCaches = make(map[string]*CodeServerActiveStatus)
 	recycleCache := CodeServerRecycleCache{}
+	recycleCache.Client = client
 	recycleCache.Caches = make(map[string]CodeServerRecycleStatus)
 	return &CodeServerWatcher{
 		client,
