@@ -17,14 +17,18 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"sync"
 
+	csv1alpha1 "github.com/opensourceways/code-server-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type CodeServerRecycleCache struct {
 	sync.RWMutex
+	client.Client
 	Caches map[string]CodeServerRecycleStatus
 }
 
@@ -41,6 +45,7 @@ func (c *CodeServerRecycleCache) AddOrUpdate(req CodeServerRequest) {
 		if req.increaseRecycleSeconds {
 			obj.Duration = obj.Duration + req.duration
 			c.Caches[req.resource.String()] = obj
+			c.update(req.resource)
 		}
 	} else {
 		c.Caches[req.resource.String()] = CodeServerRecycleStatus{
@@ -48,6 +53,14 @@ func (c *CodeServerRecycleCache) AddOrUpdate(req CodeServerRequest) {
 			LastInactiveTime: req.inactiveTime,
 			NamespacedName:   req.resource,
 		}
+	}
+}
+
+func (c *CodeServerRecycleCache) update(name types.NamespacedName) {
+	codeServer := &csv1alpha1.CodeServer{}
+	if err := c.Client.Get(context.TODO(), name, codeServer); err == nil {
+		codeServer.Spec.IncreaseRecycleSeconds = false
+		_ = c.Client.Update(context.TODO(), codeServer)
 	}
 }
 
