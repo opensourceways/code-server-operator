@@ -694,6 +694,7 @@ func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServe
 							}},
 						},
 					},
+					RestartPolicy: m.Spec.RestartPolicy,
 					Volumes: []corev1.Volume{
 						{
 							Name: "code-server-share-dir",
@@ -794,6 +795,7 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *a
 							ReadinessProbe: m.Spec.ReadinessProbe,
 						},
 					},
+					RestartPolicy: m.Spec.RestartPolicy,
 				},
 			},
 		},
@@ -1009,6 +1011,7 @@ func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer) *appsv
 							ReadinessProbe: m.Spec.ReadinessProbe,
 						},
 					},
+					RestartPolicy: m.Spec.RestartPolicy,
 				},
 			},
 		},
