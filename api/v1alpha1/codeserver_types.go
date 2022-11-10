@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"k8s.io/api/core/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -93,8 +92,6 @@ type CodeServerSpec struct {
 	ConnectionString string `json:"connectionString,omitempty" protobuf:"bytes,21,opt,name=connectionString"`
 	// whether to increase the life cycle time
 	IncreaseRecycleSeconds bool `json:"increaseRecycleSeconds,omitempty" protobuf:"bytes,22,opt,name=increaseRecycleSeconds"`
-	//Restart policy for all containers within the pod.
-	RestartPolicy corev1.RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,23,opt,name=restartPolicy"`
 }
 
 // ServerConditionType describes the type of state of code server condition
