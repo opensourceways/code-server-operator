@@ -607,7 +607,7 @@ func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServe
 	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	baseCodeDir := "/home/coder/project"
 	baseCodeVolume := "code-server-project-dir"
-	ls := appLabel(m.Name)
+	ls := appLabel(m.Name, m.Labels)
 	replicas := int32(1)
 	enablePriviledge := m.Spec.Privileged
 	priviledged := corev1.SecurityContext{
@@ -738,7 +738,7 @@ func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServe
 // deploymentForGeneric returns a code server with generic temporary environments
 func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *appsv1.Deployment {
 	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
-	ls := appLabel(m.Name)
+	ls := appLabel(m.Name, m.Labels)
 	baseCodeDir := r.getDefaultWorkSpace(m)
 	baseCodeVolume := "code-server-workspace"
 	replicas := int32(1)
@@ -943,7 +943,7 @@ func (r *CodeServerReconciler) assembleBaseLxdEnvs(
 // deploymentForLxd returns an instance with gotty based terminal on lxd Deployment object for lxc launcher
 func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer) *appsv1.Deployment {
 	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
-	ls := appLabel(m.Name)
+	ls := appLabel(m.Name, m.Labels)
 	baseProxyDir := r.getDefaultWorkSpace(m)
 	baseProxyVolume := "code-server-workspace"
 	replicas := int32(1)
@@ -1063,7 +1063,7 @@ func (r *CodeServerReconciler) getDefaultWorkSpace(m *csv1alpha1.CodeServer) str
 
 // newService function takes in a CodeServer object and returns a Service for that object.
 func (r *CodeServerReconciler) newService(m *csv1alpha1.CodeServer) *corev1.Service {
-	ls := appLabel(m.Name)
+	ls := appLabel(m.Name, m.Labels)
 	ser := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      m.Name,
@@ -1173,8 +1173,14 @@ func (r *CodeServerReconciler) annotationsForIngress() map[string]string {
 
 // appLabel returns the labels for selecting the resources
 // belonging to the given instance name.
-func appLabel(name string) map[string]string {
-	return map[string]string{"app": "codeserver", "cs_name": name}
+func appLabel(name string, labels map[string]string) map[string]string {
+	label := map[string]string{"app": "codeserver", "cs_name": name}
+	if labels != nil && len(labels) > 0 {
+		for k, v := range labels {
+			label[k] = v
+		}
+	}
+	return label
 }
 
 // NewStateCondition creates a new code server condition.
