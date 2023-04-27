@@ -553,19 +553,10 @@ func (r *CodeServerReconciler) reconcileForService(codeServer *csv1alpha1.CodeSe
 
 func (r *CodeServerReconciler) addInitContainersForDeployment(m *csv1alpha1.CodeServer, baseDir, baseDirVolume string) []corev1.Container {
 	var containers []corev1.Container
-	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
-	if len(m.Spec.InitContainers) != 0 {
-		for _, container := range m.Spec.InitContainers {
-			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-				MountPath: baseDir,
-				Name:      baseDirVolume,
-			})
-			containers = append(containers, container)
-		}
-	}
 	if len(m.Spec.InitPlugins) == 0 {
 		return containers
 	}
+	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	clientSet := _interface.PluginClients{Client: r.Client}
 	for p, arguments := range m.Spec.InitPlugins {
 		plugin, err := initplugins.CreatePlugin(clientSet, p, arguments, baseDir)
@@ -1130,12 +1121,10 @@ func (r *CodeServerReconciler) newPVC(m *csv1alpha1.CodeServer) (*corev1.Persist
 // NewIngress function takes in a CodeServer object and returns an ingress for that object.
 func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.Ingress {
 	nginxClass := "nginx"
-	pathType := ingressv1.PathTypePrefix
 	httpValue := ingressv1.HTTPIngressRuleValue{
 		Paths: []ingressv1.HTTPIngressPath{
 			{
-				Path:     "/",
-				PathType: &pathType,
+				Path: "/",
 				Backend: ingressv1.IngressBackend{
 					Service: &ingressv1.IngressServiceBackend{
 						Name: m.Name,
