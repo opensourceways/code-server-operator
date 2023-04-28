@@ -1121,10 +1121,12 @@ func (r *CodeServerReconciler) newPVC(m *csv1alpha1.CodeServer) (*corev1.Persist
 // NewIngress function takes in a CodeServer object and returns an ingress for that object.
 func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.Ingress {
 	nginxClass := "nginx"
+	pathType := ingressv1.PathTypePrefix
 	httpValue := ingressv1.HTTPIngressRuleValue{
 		Paths: []ingressv1.HTTPIngressPath{
 			{
 				Path: "/",
+				PathType: &pathType,
 				Backend: ingressv1.IngressBackend{
 					Service: &ingressv1.IngressServiceBackend{
 						Name: m.Name,
