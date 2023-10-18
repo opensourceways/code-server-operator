@@ -553,10 +553,19 @@ func (r *CodeServerReconciler) reconcileForService(codeServer *csv1alpha1.CodeSe
 
 func (r *CodeServerReconciler) addInitContainersForDeployment(m *csv1alpha1.CodeServer, baseDir, baseDirVolume string) []corev1.Container {
 	var containers []corev1.Container
+	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
+	if len(m.Spec.InitContainers) != 0 {
+		for _, container := range m.Spec.InitContainers {
+			container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+				MountPath: baseDir,
+				Name:      baseDirVolume,
+			})
+			containers = append(containers, container)
+		}
+	}
 	if len(m.Spec.InitPlugins) == 0 {
 		return containers
 	}
-	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
 	clientSet := _interface.PluginClients{Client: r.Client}
 	for p, arguments := range m.Spec.InitPlugins {
 		plugin, err := initplugins.CreatePlugin(clientSet, p, arguments, baseDir)
@@ -746,12 +755,7 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *a
 	priviledged := corev1.SecurityContext{
 		Privileged: enablePriviledge,
 	}
-	initContainer := make([]corev1.Container, 0)
-	if len(m.Spec.InitContainers) != 0 {
-		initContainer = m.Spec.InitContainers
-	} else {
-		initContainer = r.addInitContainersForDeployment(m, baseCodeDir, baseCodeVolume)
-	}
+	initContainer := r.addInitContainersForDeployment(m, baseCodeDir, baseCodeVolume)
 	reqLogger.Info(fmt.Sprintf("init containers has been injected into deployment %v", initContainer))
 	//convert liveness or readiness probe
 	if m.Spec.LivenessProbe != nil {
@@ -1130,7 +1134,7 @@ func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.I
 	httpValue := ingressv1.HTTPIngressRuleValue{
 		Paths: []ingressv1.HTTPIngressPath{
 			{
-				Path: "/",
+				Path:     "/",
 				PathType: &pathType,
 				Backend: ingressv1.IngressBackend{
 					Service: &ingressv1.IngressServiceBackend{

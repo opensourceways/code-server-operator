@@ -180,8 +180,8 @@ spec:
                 description: Specifies ingress bandwidth for code server
                 type: string
               initContainers:
-                description: Specifies the init container for code server, if specified,
-                  InitPlugins will be ignored.
+                description: Specifies the init container for code server, only supported
+                  for generic code server, if specified, InitPlugins will be ignored.
                 items:
                   description: A single application container that you want to run
                     within a pod.
@@ -1703,9 +1703,6 @@ spec:
                       to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
-              restartPolicy:
-                description: Restart policy for all containers within the pod.
-                type: string
               runtime:
                 description: Specifies the runtime used for pod boostrap
                 type: string
