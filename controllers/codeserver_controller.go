@@ -746,7 +746,12 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *a
 	priviledged := corev1.SecurityContext{
 		Privileged: enablePriviledge,
 	}
-	initContainer := r.addInitContainersForDeployment(m, baseCodeDir, baseCodeVolume)
+	initContainer := make([]corev1.Container, 0)
+	if len(m.Spec.InitContainers) != 0 {
+		initContainer = m.Spec.InitContainers
+	} else {
+		initContainer = r.addInitContainersForDeployment(m, baseCodeDir, baseCodeVolume)
+	}
 	reqLogger.Info(fmt.Sprintf("init containers has been injected into deployment %v", initContainer))
 	//convert liveness or readiness probe
 	if m.Spec.LivenessProbe != nil {
