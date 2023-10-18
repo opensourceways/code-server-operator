@@ -8,6 +8,10 @@ spec:
   subdomain: codeservergradio
   image: "tommylike/gradio-container:0.0.1"
   storageSize: "1Gi"
+  initContainers:
+    - name: init-myservice
+      image: alpine/git:latest
+      command: ['sh', '-c', "cd /workspace && git clone https://gitee.com/openeuler/infrastructure"]
   storageName: "emptyDir"
   inactiveAfterSeconds: 600
   recycleAfterSeconds: 1200
