@@ -3,7 +3,7 @@ module github.com/opensourceways/code-server-operator
 go 1.20
 
 require (
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.2.3
 	github.com/golang/glog v1.0.0
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.3
