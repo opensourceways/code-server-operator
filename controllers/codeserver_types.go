@@ -23,14 +23,14 @@ import (
 )
 
 type CodeServerOption struct {
-	DomainName          string
-	VSExporterImage     string
-	ProbeInterval       int
-	MaxProbeRetry       int
-	HttpsSecretName     string
-	LxdClientSecretName string
-	EnableUserIngress   bool
-	MaxConcurrency      int
+	DomainName             string
+	VSExporterImage        string
+	ProbeInterval          int
+	MaxProbeRetry          int
+	HttpsSecretName        string
+	LxdClientSecretName    string
+	MaxConcurrency         int
+	Oauth2ProxyServiceName string
 }
 
 type WatchType string

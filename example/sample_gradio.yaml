@@ -8,6 +8,7 @@ spec:
   subdomain: codeservergradio
   image: "tommylike/gradio-container:0.0.1"
   storageSize: "1Gi"
+  enableOauth2Proxy: true
   initContainers:
     - name: init-myservice
       image: alpine/git:latest

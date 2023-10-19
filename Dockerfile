@@ -20,10 +20,16 @@ COPY controllers/ controllers/
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${DOCKER_ARCHITECTURE} GO111MODULE=on go build -a -buildmode=pie -ldflags "-s -linkmode 'external' -extldflags '-Wl,-z,now'" -o manager main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM alpine:latest
-WORKDIR /
-COPY --from=builder /workspace/manager .
+FROM openeuler/openeuler:22.03
+ARG USERNAME=code-server
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
 
-ENTRYPOINT ["/manager"]
+RUN yum install -y shadow && groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
+
+USER $USERNAME
+WORKDIR /app
+COPY --from=builder --chown=$USER_UID:$USER_GID /workspace/manager /app
+
+ENTRYPOINT ["/app/manager"]

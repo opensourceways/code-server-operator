@@ -49,16 +49,17 @@ import (
 )
 
 const (
-	CSNAME           = "code-server"
-	MaxActiveSeconds = 60 * 60 * 24
-	MaxKeepSeconds   = 60 * 60 * 24 * 30
-	HttpPort         = 8080
-	DefaultWorkspace = "/workspace"
-	IngressLimitKey  = "kubernetes.io/ingress-bandwidth"
-	EgressLimitKey   = "kubernetes.io/egress-bandwidth"
-	StorageEmptyDir  = "emptyDir"
-	InstanceEndpoint = "instanceEndpoint"
-	TerminalIngress  = "%s-terminal"
+	CSNAME             = "code-server"
+	MaxActiveSeconds   = 60 * 60 * 24
+	MaxKeepSeconds     = 60 * 60 * 24 * 30
+	HttpPort           = 8080
+	DefaultWorkspace   = "/workspace"
+	IngressLimitKey    = "kubernetes.io/ingress-bandwidth"
+	EgressLimitKey     = "kubernetes.io/egress-bandwidth"
+	StorageEmptyDir    = "emptyDir"
+	InstanceEndpoint   = "instanceEndpoint"
+	TerminalIngress    = "%s-terminal"
+	Oauth2ProxyIngress = "%s-auth2-proxy"
 )
 
 // CodeServerReconciler reconciles a CodeServer object
@@ -183,6 +184,11 @@ func (r *CodeServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		// 3/5:reconcile ingress
 		if failed == nil {
 			_, failed = r.reconcileForIngress(codeServer)
+		}
+		if codeServer.Spec.EnableOauth2Proxy {
+			if failed == nil {
+				_, failed = r.reconcileForIngressForOauth2Proxy(codeServer)
+			}
 		}
 		// 4/5: reconcile deployment
 		if failed == nil {
@@ -339,7 +345,18 @@ func (r *CodeServerReconciler) deleteCodeServerResource(name, namespace string, 
 	reqLogger.Info("Deleting code server resources.")
 	//delete ingress
 	ing := &ingressv1.Ingress{}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, ing)
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf(Oauth2ProxyIngress, name), Namespace: namespace}, ing)
+	//error of getting object is ignored
+	if err == nil {
+		err = r.Client.Delete(context.TODO(), ing)
+		if err != nil {
+			return err
+		}
+		reqLogger.Info("oauth2 proxy ingress resource has been successfully deleted.")
+	} else if !errors.IsNotFound(err) {
+		reqLogger.Info(fmt.Sprintf("failed to get oauth2 proxy ingress resource for deletion: %v", err))
+	}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf(TerminalIngress, name), Namespace: namespace}, ing)
 	//error of getting object is ignored
 	if err == nil {
 		err = r.Client.Delete(context.TODO(), ing)
@@ -481,6 +498,40 @@ func (r *CodeServerReconciler) reconcileForDeployment(codeServer *csv1alpha1.Cod
 		}
 	}
 	return oldDev, nil
+}
+
+func (r *CodeServerReconciler) reconcileForIngressForOauth2Proxy(codeServer *csv1alpha1.CodeServer) (*ingressv1.Ingress, error) {
+	reqLogger := r.Log.WithValues("namespace", codeServer.Namespace, "name", codeServer.Name)
+	reqLogger.Info("Reconciling oauth2 proxy ingress.")
+	//reconcile oauth2 proxy ingress for code server
+	newIngress := r.NewIngressForOauth2Proxy(codeServer)
+	oldIngress := &ingressv1.Ingress{}
+	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf(Oauth2ProxyIngress, codeServer.Name), Namespace: codeServer.Namespace}, oldIngress)
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating an oauth2 proxy ingress.")
+		err = r.Client.Create(context.TODO(), newIngress)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create oauth2 proxy ingress.")
+			return nil, err
+		}
+		// if update is required
+	} else {
+		if err != nil {
+			//Reschedule the event
+			reqLogger.Error(err, fmt.Sprintf("Failed to get Oauth2 Proxy Ingress for %s.", codeServer.Name))
+			return nil, err
+		}
+		if !equality.Semantic.DeepEqual(oldIngress.Spec, newIngress.Spec) {
+			oldIngress.Spec = newIngress.Spec
+			reqLogger.Info("Updating an Oauth2 Proxy ingress.")
+			err = r.Client.Update(context.TODO(), oldIngress)
+			if err != nil {
+				reqLogger.Error(err, "Failed to update Oauth2 Proxy ingress.")
+				return nil, err
+			}
+		}
+	}
+	return oldIngress, nil
 }
 
 func (r *CodeServerReconciler) reconcileForIngress(codeServer *csv1alpha1.CodeServer) (*ingressv1.Ingress, error) {
@@ -1127,20 +1178,20 @@ func (r *CodeServerReconciler) newPVC(m *csv1alpha1.CodeServer) (*corev1.Persist
 	return pvc, nil
 }
 
-// NewIngress function takes in a CodeServer object and returns an ingress for that object.
-func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.Ingress {
+// NewIngressForOauth2Proxy function takes in a CodeServer object and returns an ingress for that object.
+func (r *CodeServerReconciler) NewIngressForOauth2Proxy(m *csv1alpha1.CodeServer) *ingressv1.Ingress {
 	nginxClass := "nginx"
 	pathType := ingressv1.PathTypePrefix
 	httpValue := ingressv1.HTTPIngressRuleValue{
 		Paths: []ingressv1.HTTPIngressPath{
 			{
-				Path:     "/",
+				Path:     "/oauth2",
 				PathType: &pathType,
 				Backend: ingressv1.IngressBackend{
 					Service: &ingressv1.IngressServiceBackend{
-						Name: m.Name,
+						Name: r.Options.Oauth2ProxyServiceName,
 						Port: ingressv1.ServiceBackendPort{
-							Number: HttpPort,
+							Number: 4180,
 						},
 					},
 				},
@@ -1149,9 +1200,8 @@ func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.I
 	}
 	ingress := &ingressv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        fmt.Sprintf(TerminalIngress, m.Name),
-			Namespace:   m.Namespace,
-			Annotations: r.annotationsForIngress(m.Spec.IngressAnnotations),
+			Name:      fmt.Sprintf(Oauth2ProxyIngress, m.Name),
+			Namespace: m.Namespace,
 		},
 		Spec: ingressv1.IngressSpec{
 			IngressClassName: &nginxClass,
@@ -1176,7 +1226,56 @@ func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.I
 	return ingress
 }
 
-func (r *CodeServerReconciler) annotationsForIngress(customAnnotations map[string]string) map[string]string {
+// NewIngress function takes in a CodeServer object and returns an ingress for that object.
+func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.Ingress {
+	nginxClass := "nginx"
+	pathType := ingressv1.PathTypePrefix
+	httpValue := ingressv1.HTTPIngressRuleValue{
+		Paths: []ingressv1.HTTPIngressPath{
+			{
+				Path:     "/",
+				PathType: &pathType,
+				Backend: ingressv1.IngressBackend{
+					Service: &ingressv1.IngressServiceBackend{
+						Name: m.Name,
+						Port: ingressv1.ServiceBackendPort{
+							Number: HttpPort,
+						},
+					},
+				},
+			},
+		},
+	}
+	ingress := &ingressv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        fmt.Sprintf(TerminalIngress, m.Name),
+			Namespace:   m.Namespace,
+			Annotations: r.annotationsForIngress(m.Spec.EnableOauth2Proxy),
+		},
+		Spec: ingressv1.IngressSpec{
+			IngressClassName: &nginxClass,
+			Rules: []ingressv1.IngressRule{
+				{
+					Host: fmt.Sprintf("%s.%s", m.Spec.Subdomain, r.Options.DomainName),
+					IngressRuleValue: ingressv1.IngressRuleValue{
+						HTTP: &httpValue,
+					},
+				},
+			},
+		},
+	}
+	ingress.Spec.TLS = []ingressv1.IngressTLS{
+		{
+			Hosts:      []string{fmt.Sprintf("%s.%s", m.Spec.Subdomain, r.Options.DomainName)},
+			SecretName: r.Options.HttpsSecretName,
+		},
+	}
+	// Set CodeServer instance as the owner of the ingress.
+	controllerutil.SetControllerReference(m, ingress, r.Scheme)
+	return ingress
+}
+
+func (r *CodeServerReconciler) annotationsForIngress(enableOauth2Proxy bool) map[string]string {
 	annotation := map[string]string{}
 	// currently, we don't enable https for backend
 	//annotation["nginx.ingress.kubernetes.io/secure-backends"] = "true"
@@ -1184,8 +1283,9 @@ func (r *CodeServerReconciler) annotationsForIngress(customAnnotations map[strin
 
 	annotation["nginx.ingress.kubernetes.io/proxy-read-timeout"] = "1800"
 	annotation["nginx.ingress.kubernetes.io/proxy-send-timeout"] = "1800"
-	for k, v := range customAnnotations {
-		annotation[k] = v
+	if enableOauth2Proxy {
+		annotation["nginx.ingress.kubernetes.io/auth-url"] = "https://$host/oauth2/auth"
+		annotation["nginx.ingress.kubernetes.io/auth-signin"] = "https://$host/oauth2/start?rd=$escaped_request_uri"
 	}
 	return annotation
 }

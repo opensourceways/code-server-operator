@@ -94,8 +94,10 @@ type CodeServerSpec struct {
 	IncreaseRecycleSeconds bool `json:"increaseRecycleSeconds,omitempty" protobuf:"bytes,24,opt,name=increaseRecycleSeconds"`
 	// Specifies the init container for code server, only supported for generic code server, if specified, InitPlugins will be ignored.
 	InitContainers []v1.Container `json:"initContainers,omitempty" protobuf:"bytes,25,opt,name=initContainers"`
-	// Specifies ingress custom annotations
-	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty" protobuf:"bytes,26,opt,name=ingressAnnotations"`
+	// Whether to enable oauth2-proxy for code server instance, note this work with nginx ingress oauth external auth
+	// see: https://oauth2-proxy.github.io/oauth2-proxy/
+	// and: https://kubernetes.github.io/ingress-nginx/examples/auth/oauth-external-auth/
+	EnableOauth2Proxy bool `json:"enableOauth2Proxy,omitempty" protobuf:"bytes,26,opt,name=enableOauth2Proxy"`
 }
 
 // ServerConditionType describes the type of state of code server condition
