@@ -69,10 +69,8 @@ func SetupSignalHandler() (stopCh <-chan struct{}) {
 }
 
 func main() {
-	var metricsAddr string
 	var enableLeaderElection bool
 	csOption := controllers.CodeServerOption{}
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&csOption.DomainName, "domain-name", "pool1.playground.osinfra.cn", "Code server domain name.")
@@ -93,10 +91,8 @@ func main() {
 	}))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		LeaderElection:     enableLeaderElection,
-		Port:               9443,
+		Scheme:         scheme,
+		LeaderElection: enableLeaderElection,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
