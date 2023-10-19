@@ -79,6 +79,8 @@ type CodeServerSpec struct {
 	Privileged *bool `json:"privileged,omitempty" protobuf:"bytes,17,opt,name=privileged"`
 	// Specifies the init plugins that will be running to finish before code server running.
 	InitPlugins map[string][]string `json:"initPlugins,omitempty" protobuf:"bytes,18,opt,name=initPlugins"`
+	// Specifies the init container for code server, only supported for generic code server, if specified, InitPlugins will be ignored.
+	InitContainers []v1.Container `json:"initContainers,omitempty" protobuf:"bytes,18,opt,name=initPlugins"`
 	// Specifies the node selector for scheduling.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,19,opt,name=nodeSelector"`
 	// Specifies the liveness Probe.
