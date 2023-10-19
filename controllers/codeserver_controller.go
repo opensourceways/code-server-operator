@@ -1151,7 +1151,7 @@ func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.I
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        fmt.Sprintf(TerminalIngress, m.Name),
 			Namespace:   m.Namespace,
-			Annotations: r.annotationsForIngress(),
+			Annotations: r.annotationsForIngress(m.Spec.IngressAnnotations),
 		},
 		Spec: ingressv1.IngressSpec{
 			IngressClassName: &nginxClass,
@@ -1176,7 +1176,7 @@ func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.I
 	return ingress
 }
 
-func (r *CodeServerReconciler) annotationsForIngress() map[string]string {
+func (r *CodeServerReconciler) annotationsForIngress(customAnnotations map[string]string) map[string]string {
 	annotation := map[string]string{}
 	// currently, we don't enable https for backend
 	//annotation["nginx.ingress.kubernetes.io/secure-backends"] = "true"
@@ -1184,6 +1184,9 @@ func (r *CodeServerReconciler) annotationsForIngress() map[string]string {
 
 	annotation["nginx.ingress.kubernetes.io/proxy-read-timeout"] = "1800"
 	annotation["nginx.ingress.kubernetes.io/proxy-send-timeout"] = "1800"
+	for k, v := range customAnnotations {
+		annotation[k] = v
+	}
 	return annotation
 }
 
