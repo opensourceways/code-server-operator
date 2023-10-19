@@ -79,21 +79,23 @@ type CodeServerSpec struct {
 	Privileged *bool `json:"privileged,omitempty" protobuf:"bytes,17,opt,name=privileged"`
 	// Specifies the init plugins that will be running to finish before code server running.
 	InitPlugins map[string][]string `json:"initPlugins,omitempty" protobuf:"bytes,18,opt,name=initPlugins"`
-	// Specifies the init container for code server, only supported for generic code server, if specified, InitPlugins will be ignored.
-	InitContainers []v1.Container `json:"initContainers,omitempty" protobuf:"bytes,18,opt,name=initPlugins"`
 	// Specifies the node selector for scheduling.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,19,opt,name=nodeSelector"`
 	// Specifies the liveness Probe.
 	LivenessProbe *v1.Probe `json:"livenessProbe,omitempty" protobuf:"bytes,20,opt,name=livenessProbe"`
 	// Specifies the readiness Probe.
-	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty" protobuf:"bytes,19,opt,name=readinessProbe"`
+	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty" protobuf:"bytes,21,opt,name=readinessProbe"`
 	// Specifies the terminal container port for connection, defaults in 8080.
-	ContainerPort string `json:"containerPort,omitempty" protobuf:"bytes,20,opt,name=containerPort"`
+	ContainerPort string `json:"containerPort,omitempty" protobuf:"bytes,22,opt,name=containerPort"`
 	// Specifies the connectionString for frontend to connect, MUST within to string placeholder for subdomain and
 	// hostname, for example https://%s.%s/terminal or wss://%s.%s/ws, NOTE, tls MUST be enabled
-	ConnectionString string `json:"connectionString,omitempty" protobuf:"bytes,21,opt,name=connectionString"`
+	ConnectionString string `json:"connectionString,omitempty" protobuf:"bytes,23,opt,name=connectionString"`
 	// whether to increase the life cycle time
-	IncreaseRecycleSeconds bool `json:"increaseRecycleSeconds,omitempty" protobuf:"bytes,22,opt,name=increaseRecycleSeconds"`
+	IncreaseRecycleSeconds bool `json:"increaseRecycleSeconds,omitempty" protobuf:"bytes,24,opt,name=increaseRecycleSeconds"`
+	// Specifies the init container for code server, only supported for generic code server, if specified, InitPlugins will be ignored.
+	InitContainers []v1.Container `json:"initContainers,omitempty" protobuf:"bytes,25,opt,name=initContainers"`
+	// Specifies ingress custom annotations
+	IngressAnnotations map[string]string `json:"ingressAnnotations,omitempty" protobuf:"bytes,26,opt,name=ingressAnnotations"`
 }
 
 // ServerConditionType describes the type of state of code server condition

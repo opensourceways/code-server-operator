@@ -176,6 +176,11 @@ spec:
               increaseRecycleSeconds:
                 description: whether to increase the life cycle time
                 type: boolean
+              ingressAnnotations:
+                additionalProperties:
+                  type: string
+                description: Specifies ingress custom annotations
+                type: object
               ingressBandwidth:
                 description: Specifies ingress bandwidth for code server
                 type: string

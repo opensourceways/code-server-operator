@@ -143,13 +143,6 @@ func (in *CodeServerSpec) DeepCopyInto(out *CodeServerSpec) {
 			(*out)[key] = outVal
 		}
 	}
-	if in.InitContainers != nil {
-		in, out := &in.InitContainers, &out.InitContainers
-		*out = make([]v1.Container, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = make(map[string]string, len(*in))
@@ -166,6 +159,20 @@ func (in *CodeServerSpec) DeepCopyInto(out *CodeServerSpec) {
 		in, out := &in.ReadinessProbe, &out.ReadinessProbe
 		*out = new(v1.Probe)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.InitContainers != nil {
+		in, out := &in.InitContainers, &out.InitContainers
+		*out = make([]v1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.IngressAnnotations != nil {
+		in, out := &in.IngressAnnotations, &out.IngressAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
 	}
 }
 
