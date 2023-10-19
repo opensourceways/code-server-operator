@@ -18,7 +18,7 @@ COPY api/ api/
 COPY controllers/ controllers/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${DOCKER_ARCHITECTURE} GO111MODULE=on go build -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${DOCKER_ARCHITECTURE} GO111MODULE=on go build -a -buildmode=pie -ldflags "-s -linkmode 'external' -extldflags '-Wl,-z,now'" -o manager main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
