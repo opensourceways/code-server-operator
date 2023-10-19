@@ -1176,7 +1176,7 @@ func (r *CodeServerReconciler) NewIngress(m *csv1alpha1.CodeServer) *ingressv1.I
 	return ingress
 }
 
-func (r *CodeServerReconciler) annotationsForIngress(customAnnotations map[string]string) map[string]string {
+func (r *CodeServerReconciler) annotationsForIngress(custom_annotations map[string]string) map[string]string {
 	annotation := map[string]string{}
 	// currently, we don't enable https for backend
 	//annotation["nginx.ingress.kubernetes.io/secure-backends"] = "true"
@@ -1184,7 +1184,7 @@ func (r *CodeServerReconciler) annotationsForIngress(customAnnotations map[strin
 
 	annotation["nginx.ingress.kubernetes.io/proxy-read-timeout"] = "1800"
 	annotation["nginx.ingress.kubernetes.io/proxy-send-timeout"] = "1800"
-	for k, v := range customAnnotations {
+	for k, v := range custom_annotations {
 		annotation[k] = v
 	}
 	return annotation
