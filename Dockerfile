@@ -32,4 +32,6 @@ USER $USERNAME
 WORKDIR /app
 COPY --from=builder --chown=$USER_UID:$USER_GID /workspace/manager /app
 
+RUN chmod 550 /app/manager
+
 ENTRYPOINT ["/app/manager"]
