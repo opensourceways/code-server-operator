@@ -767,6 +767,11 @@ func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServe
 		},
 	}
 
+	//specify scheduler name if specified
+	if len(m.Spec.SchedulerName) != 0 {
+		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
+	}
+
 	// add volume pvc pr emptyDir
 	if r.needDeployPVC(m.Spec.StorageName) {
 		dataVolume := corev1.PersistentVolumeClaimVolumeSource{
@@ -858,6 +863,12 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *a
 			},
 		},
 	}
+
+	//specify scheduler name if specified
+	if len(m.Spec.SchedulerName) != 0 {
+		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
+	}
+
 	// add volume pvc pr emptyDir
 	if r.needDeployPVC(m.Spec.StorageName) {
 		dataVolume := corev1.PersistentVolumeClaimVolumeSource{
@@ -1073,6 +1084,12 @@ func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer) *appsv
 			},
 		},
 	}
+
+	//specify scheduler name if specified
+	if len(m.Spec.SchedulerName) != 0 {
+		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
+	}
+
 	// add secret volume for lxd cert
 	secretVolume := corev1.Volume{
 		Name: baseProxyVolume,

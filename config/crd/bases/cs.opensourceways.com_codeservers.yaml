@@ -1711,6 +1711,9 @@ spec:
               runtime:
                 description: Specifies the runtime used for pod boostrap
                 type: string
+              schedulerName:
+                description: Specifies scheduler name for code server
+                type: string
               storageAnnotations:
                 additionalProperties:
                   type: string
