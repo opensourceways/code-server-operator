@@ -98,6 +98,8 @@ type CodeServerSpec struct {
 	// see: https://oauth2-proxy.github.io/oauth2-proxy/
 	// and: https://kubernetes.github.io/ingress-nginx/examples/auth/oauth-external-auth/
 	EnableOauth2Proxy bool `json:"enableOauth2Proxy,omitempty" protobuf:"bytes,26,opt,name=enableOauth2Proxy"`
+	// Specifies scheduler name for code server
+	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,27,opt,name=schedulerName"`
 }
 
 // ServerConditionType describes the type of state of code server condition
