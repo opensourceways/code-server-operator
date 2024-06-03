@@ -69,6 +69,9 @@ spec:
                   note this work with nginx ingress oauth external auth see: https://oauth2-proxy.github.io/oauth2-proxy/
                   and: https://kubernetes.github.io/ingress-nginx/examples/auth/oauth-external-auth/'
                 type: boolean
+              enableAscend:
+                description: 'Whether to enable Ascend Hardware'
+                type: boolean
               envs:
                 description: Specifies the envs
                 items:
