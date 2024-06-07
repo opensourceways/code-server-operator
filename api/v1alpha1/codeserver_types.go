@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -100,6 +100,8 @@ type CodeServerSpec struct {
 	EnableOauth2Proxy bool `json:"enableOauth2Proxy,omitempty" protobuf:"bytes,26,opt,name=enableOauth2Proxy"`
 	// Specifies scheduler name for code server
 	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,27,opt,name=schedulerName"`
+	// Whether to enable Ascend Hardware
+	EnableAscend bool `json:"enableAscend,omitempty" protobuf:"bytes,28,opt,name=enableAscend"`
 }
 
 // ServerConditionType describes the type of state of code server condition

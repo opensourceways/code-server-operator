@@ -28,7 +28,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/opensourceways/code-server-operator/controllers/initplugins"
-	"github.com/opensourceways/code-server-operator/controllers/initplugins/interface"
+	_interface "github.com/opensourceways/code-server-operator/controllers/initplugins/interface"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ingressv1 "k8s.io/api/networking/v1"
@@ -892,6 +892,28 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *a
 			},
 		})
 	}
+
+	if m.Spec.EnableAscend {
+		ascendName := "ascend-driver"
+		ascendVolumePath := "/usr/local/Ascend/driver"
+
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(dep.Spec.Template.Spec.Containers[0].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      ascendName,
+				MountPath: ascendVolumePath,
+				ReadOnly:  true,
+			})
+
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: ascendName,
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: ascendVolumePath,
+				},
+			},
+		})
+	}
+
 	//https will be disabled no matter secret is provided or not. we also export same port here.
 	for index, con := range dep.Spec.Template.Spec.Containers {
 		if con.Name == CSNAME {
