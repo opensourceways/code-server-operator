@@ -102,6 +102,10 @@ type CodeServerSpec struct {
 	SchedulerName string `json:"schedulerName,omitempty" protobuf:"bytes,27,opt,name=schedulerName"`
 	// Whether to enable Ascend Hardware
 	EnableAscend bool `json:"enableAscend,omitempty" protobuf:"bytes,28,opt,name=enableAscend"`
+	// Specifies security context for code server
+	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,29,opt,name=securityContext"`
+	// Specifies AutomountServiceAccountToken for code server
+	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty" protobuf:"bytes,30,opt,name=automountServiceAccountToken"`
 }
 
 // ServerConditionType describes the type of state of code server condition
