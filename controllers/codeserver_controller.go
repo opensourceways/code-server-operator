@@ -772,9 +772,14 @@ func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServe
 		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
 	}
 
-	//specify security context if specified
+	//specify container security context if specified
 	if m.Spec.SecurityContext != nil {
 		dep.Spec.Template.Spec.Containers[0].SecurityContext = m.Spec.SecurityContext
+	}
+
+	//specify pod security context if specified
+	if m.Spec.PodSecurityContext != nil {
+		dep.Spec.Template.Spec.SecurityContext = m.Spec.PodSecurityContext
 	}
 
 	//specify AutomountServiceAccountToken filed if specified
@@ -879,9 +884,14 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *a
 		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
 	}
 
-	//specify security context if specified
+	//specify container security context if specified
 	if m.Spec.SecurityContext != nil {
 		dep.Spec.Template.Spec.Containers[0].SecurityContext = m.Spec.SecurityContext
+	}
+
+	//specify pod security context if specified
+	if m.Spec.PodSecurityContext != nil {
+		dep.Spec.Template.Spec.SecurityContext = m.Spec.PodSecurityContext
 	}
 
 	//specify AutomountServiceAccountToken filed if specified
@@ -1132,9 +1142,14 @@ func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer) *appsv
 		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
 	}
 
-	//specify security context if specified
+	//specify container security context if specified
 	if m.Spec.SecurityContext != nil {
 		dep.Spec.Template.Spec.Containers[0].SecurityContext = m.Spec.SecurityContext
+	}
+
+	//specify pod security context if specified
+	if m.Spec.PodSecurityContext != nil {
+		dep.Spec.Template.Spec.SecurityContext = m.Spec.PodSecurityContext
 	}
 
 	//specify AutomountServiceAccountToken filed if specified
