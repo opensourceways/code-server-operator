@@ -772,6 +772,21 @@ func (r *CodeServerReconciler) deploymentForVSCodeServer(m *csv1alpha1.CodeServe
 		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
 	}
 
+	//specify container security context if specified
+	if m.Spec.SecurityContext != nil {
+		dep.Spec.Template.Spec.Containers[0].SecurityContext = m.Spec.SecurityContext
+	}
+
+	//specify pod security context if specified
+	if m.Spec.PodSecurityContext != nil {
+		dep.Spec.Template.Spec.SecurityContext = m.Spec.PodSecurityContext
+	}
+
+	//specify AutomountServiceAccountToken filed if specified
+	if m.Spec.AutomountServiceAccountToken != nil {
+		dep.Spec.Template.Spec.AutomountServiceAccountToken = m.Spec.AutomountServiceAccountToken
+	}
+
 	// add volume pvc pr emptyDir
 	if r.needDeployPVC(m.Spec.StorageName) {
 		dataVolume := corev1.PersistentVolumeClaimVolumeSource{
@@ -867,6 +882,21 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *a
 	//specify scheduler name if specified
 	if len(m.Spec.SchedulerName) != 0 {
 		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
+	}
+
+	//specify container security context if specified
+	if m.Spec.SecurityContext != nil {
+		dep.Spec.Template.Spec.Containers[0].SecurityContext = m.Spec.SecurityContext
+	}
+
+	//specify pod security context if specified
+	if m.Spec.PodSecurityContext != nil {
+		dep.Spec.Template.Spec.SecurityContext = m.Spec.PodSecurityContext
+	}
+
+	//specify AutomountServiceAccountToken filed if specified
+	if m.Spec.AutomountServiceAccountToken != nil {
+		dep.Spec.Template.Spec.AutomountServiceAccountToken = m.Spec.AutomountServiceAccountToken
 	}
 
 	// add volume pvc pr emptyDir
@@ -1112,6 +1142,21 @@ func (r *CodeServerReconciler) deploymentForLxd(m *csv1alpha1.CodeServer) *appsv
 		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
 	}
 
+	//specify container security context if specified
+	if m.Spec.SecurityContext != nil {
+		dep.Spec.Template.Spec.Containers[0].SecurityContext = m.Spec.SecurityContext
+	}
+
+	//specify pod security context if specified
+	if m.Spec.PodSecurityContext != nil {
+		dep.Spec.Template.Spec.SecurityContext = m.Spec.PodSecurityContext
+	}
+
+	//specify AutomountServiceAccountToken filed if specified
+	if m.Spec.AutomountServiceAccountToken != nil {
+		dep.Spec.Template.Spec.AutomountServiceAccountToken = m.Spec.AutomountServiceAccountToken
+	}
+
 	// add secret volume for lxd cert
 	secretVolume := corev1.Volume{
 		Name: baseProxyVolume,
@@ -1322,6 +1367,7 @@ func (r *CodeServerReconciler) annotationsForIngress(enableOauth2Proxy bool) map
 
 	annotation["nginx.ingress.kubernetes.io/proxy-read-timeout"] = "1800"
 	annotation["nginx.ingress.kubernetes.io/proxy-send-timeout"] = "1800"
+	annotation["nginx.ingress.kubernetes.io/proxy-body-size"] = "8m"
 	if enableOauth2Proxy {
 		annotation["nginx.ingress.kubernetes.io/auth-url"] = "https://$host/oauth2/auth"
 		annotation["nginx.ingress.kubernetes.io/auth-signin"] = "https://$host/oauth2/start?rd=$escaped_request_uri"
