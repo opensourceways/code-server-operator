@@ -38,6 +38,8 @@ const (
 	RuntimePGWeb RuntimeType = "pgweb"
 	// RuntimeGeneric stands for generic instance.
 	RuntimeGeneric RuntimeType = "generic"
+	// RuntimeNginx stands for nginx instance.
+	RuntimeNginx RuntimeType = "nginx"
 )
 
 // CodeServerSpec defines the desired state of CodeServer
@@ -105,9 +107,13 @@ type CodeServerSpec struct {
 	// Specifies container security context for code server
 	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,29,opt,name=securityContext"`
 	// Specifies pod security context for code server
-	PodSecurityContext *v1.PodSecurityContext `json:"podSecurityContext,omitempty" protobuf:"bytes,30,opt,name=securityContext"`
+	PodSecurityContext *v1.PodSecurityContext `json:"podSecurityContext,omitempty" protobuf:"bytes,30,opt,name=podSecurityContext"`
 	// Specifies AutomountServiceAccountToken for code server
 	AutomountServiceAccountToken *bool `json:"automountServiceAccountToken,omitempty" protobuf:"bytes,31,opt,name=automountServiceAccountToken"`
+	// Specifies the image used to running nginx container
+	NginxImage string `json:"nginxImage,omitempty" protobuf:"bytes,32,opt,name=nginxImage"`
+	// Specifies the resource requirements for nginx container
+	NginxResources v1.ResourceRequirements `json:"nginxResources,omitempty" protobuf:"bytes,33,opt,name=nginxResources"`
 }
 
 // ServerConditionType describes the type of state of code server condition
