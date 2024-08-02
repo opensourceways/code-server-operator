@@ -646,6 +646,9 @@ func (r *CodeServerReconciler) newDeployment(m *csv1alpha1.CodeServer) (*appsv1.
 	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeLxd)) {
 		//Create code server environment with gotty based terminal which runs on lxd
 		return r.deploymentForLxd(m), nil
+	} else if strings.EqualFold(instanceRuntime, string(csv1alpha1.RuntimeNginx)) {
+		//Create code server environment with gotty based terminal which runs on lxd
+		return r.deploymentForTwoContainer(m), nil
 	} else {
 		return nil, errrorlib.New(fmt.Sprintf("unsupported runtime %s", m.Spec.Runtime))
 	}
@@ -870,6 +873,180 @@ func (r *CodeServerReconciler) deploymentForGeneric(m *csv1alpha1.CodeServer) *a
 								},
 							},
 							Resources:      m.Spec.Resources,
+							LivenessProbe:  m.Spec.LivenessProbe,
+							ReadinessProbe: m.Spec.ReadinessProbe,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	//specify scheduler name if specified
+	if len(m.Spec.SchedulerName) != 0 {
+		dep.Spec.Template.Spec.SchedulerName = m.Spec.SchedulerName
+	}
+
+	//specify container security context if specified
+	if m.Spec.SecurityContext != nil {
+		dep.Spec.Template.Spec.Containers[0].SecurityContext = m.Spec.SecurityContext
+	}
+
+	//specify pod security context if specified
+	if m.Spec.PodSecurityContext != nil {
+		dep.Spec.Template.Spec.SecurityContext = m.Spec.PodSecurityContext
+	}
+
+	//specify AutomountServiceAccountToken filed if specified
+	if m.Spec.AutomountServiceAccountToken != nil {
+		dep.Spec.Template.Spec.AutomountServiceAccountToken = m.Spec.AutomountServiceAccountToken
+	}
+
+	// add volume pvc pr emptyDir
+	if r.needDeployPVC(m.Spec.StorageName) {
+		dataVolume := corev1.PersistentVolumeClaimVolumeSource{
+			ClaimName: m.Name,
+		}
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: baseCodeVolume,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &dataVolume,
+			},
+		})
+	} else {
+		volumeQuantity, _ := resourcev1.ParseQuantity(m.Spec.StorageSize)
+		dataVolume := corev1.EmptyDirVolumeSource{
+			SizeLimit: &volumeQuantity,
+		}
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: baseCodeVolume,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &dataVolume,
+			},
+		})
+	}
+
+	if m.Spec.EnableAscend {
+		ascendName := "ascend-driver"
+		ascendVolumePath := "/usr/local/Ascend/driver"
+
+		dep.Spec.Template.Spec.Containers[0].VolumeMounts = append(dep.Spec.Template.Spec.Containers[0].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      ascendName,
+				MountPath: ascendVolumePath,
+				ReadOnly:  true,
+			})
+
+		dep.Spec.Template.Spec.Volumes = append(dep.Spec.Template.Spec.Volumes, corev1.Volume{
+			Name: ascendName,
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: ascendVolumePath,
+				},
+			},
+		})
+	}
+
+	//https will be disabled no matter secret is provided or not. we also export same port here.
+	for index, con := range dep.Spec.Template.Spec.Containers {
+		if con.Name == CSNAME {
+			if len(m.Spec.Command) != 0 {
+				dep.Spec.Template.Spec.Containers[index].Command = m.Spec.Command
+			} else if len(m.Spec.Args) != 0 {
+				dep.Spec.Template.Spec.Containers[index].Args = m.Spec.Args
+			}
+			containerPort := r.getContainerPort(m)
+			dep.Spec.Template.Spec.Containers[index].Ports = append(
+				dep.Spec.Template.Spec.Containers[index].Ports, corev1.ContainerPort{
+					ContainerPort: int32(containerPort.IntValue()),
+					Name:          "http",
+				})
+		}
+	}
+	// Append ingress and egress limit
+	dep.Spec.Template.Annotations = map[string]string{}
+	if len(m.Spec.IngressBandwidth) != 0 {
+		dep.Spec.Template.Annotations[IngressLimitKey] = m.Spec.IngressBandwidth
+	}
+	if len(m.Spec.EgressBandwidth) != 0 {
+		dep.Spec.Template.Annotations[EgressLimitKey] = m.Spec.EgressBandwidth
+	}
+	// Set CodeServer instance as the owner of the Deployment.
+	controllerutil.SetControllerReference(m, dep, r.Scheme)
+	return dep
+}
+
+// deploymentForTwoContainer returns a code server with generic temporary environments
+func (r *CodeServerReconciler) deploymentForTwoContainer(m *csv1alpha1.CodeServer) *appsv1.Deployment {
+	reqLogger := r.Log.WithValues("namespace", m.Namespace, "name", m.Name)
+	ls := appLabel(m.Name, m.Labels)
+	baseCodeDir := r.getDefaultWorkSpace(m)
+	baseCodeVolume := "code-server-workspace"
+	replicas := int32(1)
+	enablePriviledge := m.Spec.Privileged
+	priviledged := corev1.SecurityContext{
+		Privileged: enablePriviledge,
+	}
+	initContainer := r.addInitContainersForDeployment(m, baseCodeDir, baseCodeVolume)
+	reqLogger.Info(fmt.Sprintf("init containers has been injected into deployment %v", initContainer))
+	//convert liveness or readiness probe
+	if m.Spec.LivenessProbe != nil {
+		if m.Spec.LivenessProbe.HTTPGet != nil {
+			m.Spec.LivenessProbe.HTTPGet.Port = r.getContainerPort(m)
+		}
+	}
+	if m.Spec.ReadinessProbe != nil {
+		if m.Spec.ReadinessProbe.HTTPGet != nil {
+			m.Spec.ReadinessProbe.HTTPGet.Port = r.getContainerPort(m)
+		}
+	}
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      m.Name,
+			Namespace: m.Namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: ls,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: ls,
+				},
+				Spec: corev1.PodSpec{
+					InitContainers: initContainer,
+					NodeSelector:   m.Spec.NodeSelector,
+					Containers: []corev1.Container{
+						{
+							Image:           m.Spec.Image,
+							Name:            CSNAME,
+							Env:             m.Spec.Envs,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &priviledged,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: baseCodeDir,
+									Name:      baseCodeVolume,
+								},
+							},
+							Resources:      m.Spec.Resources,
+							LivenessProbe:  m.Spec.LivenessProbe,
+							ReadinessProbe: m.Spec.ReadinessProbe,
+						},
+						{
+							Image:           m.Spec.NginxImage,
+							Name:            fmt.Sprintf("%s-nginx", CSNAME),
+							Env:             m.Spec.Envs,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &priviledged,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: baseCodeDir,
+									Name:      baseCodeVolume,
+								},
+							},
+							Resources:      m.Spec.NginxResources,
 							LivenessProbe:  m.Spec.LivenessProbe,
 							ReadinessProbe: m.Spec.ReadinessProbe,
 						},
